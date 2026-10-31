@@ -116,7 +116,11 @@ if status == "abstained" or grade == "ABSTAIN" or not plans:
                 data=pt_data,
                 get_position="coordinates",
                 get_color="color",
-                get_radius=8000,
+                get_radius=500,
+                radius_units="meters",
+                radius_scale=1,
+                radius_min_pixels=4,
+                radius_max_pixels=12,
                 pickable=True,
             )
             st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text": "{name}"}))
@@ -148,7 +152,7 @@ if req_payload and "origin" in req_payload:
         "name": f"Origin: {orig_label}",
         "coordinates": [orig["lon"], orig["lat"]],
         "color": COLOR_ORIGIN,
-        "radius": 12000,
+        "radius": 500,
     })
 
 for pt in map_points:
@@ -161,7 +165,7 @@ for pt in map_points:
         "name": f"{prefix}{pt.get('name', m_id)} [{prec_str}]",
         "coordinates": [pt.get("lon"), pt.get("lat")],
         "color": c,
-        "radius": 10000 if lbl else 6000,
+        "radius": 500,
     })
 
 # Route paths
@@ -194,6 +198,8 @@ if path_data:
     )
 
 if scatter_data:
+    # Tuned ~500m real-world radius with 4px min and 12px max caps so markers
+    # remain crisp dots on their exact point rather than blobs covering entire towns.
     layers.append(
         pdk.Layer(
             "ScatterplotLayer",
@@ -201,22 +207,47 @@ if scatter_data:
             get_position="coordinates",
             get_color="color",
             get_radius="radius",
+            radius_units="meters",
+            radius_scale=1,
+            radius_min_pixels=4,
+            radius_max_pixels=12,
             pickable=True,
         )
     )
 
 center_lat = 18.52
 center_lon = 73.86
+computed_zoom = 7.5
 if scatter_data:
-    valid_coords = [d["coordinates"] for d in scatter_data if d["coordinates"]]
+    valid_coords = [d["coordinates"] for d in scatter_data if d.get("coordinates") and len(d["coordinates"]) == 2]
     if valid_coords:
-        center_lon = sum(c[0] for c in valid_coords) / len(valid_coords)
-        center_lat = sum(c[1] for c in valid_coords) / len(valid_coords)
+        lons = [c[0] for c in valid_coords if c[0] is not None]
+        lats = [c[1] for c in valid_coords if c[1] is not None]
+        if lons and lats:
+            min_lon, max_lon = min(lons), max(lons)
+            min_lat, max_lat = min(lats), max(lats)
+            center_lon = (min_lon + max_lon) / 2.0
+            center_lat = (min_lat + max_lat) / 2.0
+            max_span = max(max_lat - min_lat, max_lon - min_lon)
+            if max_span > 6.0:
+                computed_zoom = 6.0
+            elif max_span > 3.5:
+                computed_zoom = 6.8
+            elif max_span > 2.0:
+                computed_zoom = 7.5
+            elif max_span > 1.0:
+                computed_zoom = 8.2
+            elif max_span > 0.5:
+                computed_zoom = 9.0
+            elif max_span > 0.2:
+                computed_zoom = 10.2
+            else:
+                computed_zoom = 11.5
 
 view_state = pdk.ViewState(
     latitude=center_lat,
     longitude=center_lon,
-    zoom=7,
+    zoom=computed_zoom,
     pitch=0,
 )
 
