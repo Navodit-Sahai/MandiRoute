@@ -6,17 +6,18 @@ Steps:
   2. source_gate (check environment/mode readiness)
   3. assemble (fetch candidates, prices, routes, weather)
   4. decide (call engine build_plan_set once)
-  5. explain (render summary via app.explain if installed, else None)
-  6. done (finalize flow result)
+  5. geo (extract map_points and route_paths for UI)
+  6. explain (render summary via app.explain if installed, else None)
+  7. done (finalize flow result)
 
 Every step is recorded to the agent_trace SQLite table.
 """
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from app import guards
 from app.config import get_settings
@@ -37,6 +38,8 @@ class FlowResult:
     source_status: list[SourceStatus]
     trace_id: str
     summary: Optional[str] = None
+    map_points: list[dict[str, Any]] = field(default_factory=list)
+    route_paths: dict[str, list[list[float]]] = field(default_factory=dict)
 
 
 def _record_trace(
@@ -159,7 +162,38 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     )
     step_num += 1
 
-    # 5. Explain: Render summary if explainer module exists
+    # 5. Geo extraction: map points and routes for UI
+    map_points: list[dict[str, Any]] = [
+        {
+            "mandi_id": c.mandi_id,
+            "name": c.mandi_name,
+            "lat": c.location.lat,
+            "lon": c.location.lon,
+            "precision": c.location_precision,
+        }
+        for c in assembly.candidates
+    ]
+    used_route_ids = {p.option.route_id for p in planset.plans}
+    route_paths: dict[str, list[list[float]]] = {}
+    for c in assembly.candidates:
+        for r in c.routes:
+            if r.route_id in used_route_ids and r.route_id not in route_paths:
+                route_paths[r.route_id] = [[wp.point.lat, wp.point.lon] for wp in r.waypoints]
+
+    geo_summary = json.dumps({"map_points": map_points, "route_paths": route_paths})
+    _record_trace(
+        plan_id=plan_id,
+        step=step_num,
+        node="geo",
+        tool="extract_geo_points",
+        args_json="{}",
+        result_summary=geo_summary,
+        ok=True,
+        ts=ts_now,
+    )
+    step_num += 1
+
+    # 6. Explain: Render summary if explainer module exists
     summary: Optional[str] = None
     explain_summary = "Explainer not installed, summary=None"
     try:
@@ -182,7 +216,7 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     )
     step_num += 1
 
-    # 6. Done: Finalize status
+    # 7. Done: Finalize status
     is_abstained = planset.coverage.grade == "ABSTAIN" or len(planset.plans) == 0
     final_status = "abstained" if is_abstained else "awaiting_approval"
     _record_trace(
@@ -204,5 +238,6 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
         source_status=assembly.source_status,
         trace_id=trace_id,
         summary=summary,
+        map_points=map_points,
+        route_paths=route_paths,
     )
-

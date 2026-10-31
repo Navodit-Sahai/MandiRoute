@@ -177,6 +177,9 @@ def test_post_plan_with_fixture_assembly_persists_rows(client, monkeypatch):
     data = res.json()
     assert data["status"] == "awaiting_approval"
     assert len(data["planset"]["plans"]) >= 1
+    assert len(data["map_points"]) == 1
+    assert data["map_points"][0]["mandi_id"] == "FIXTURE_m1"
+    assert "FIXTURE_m1~r0" in data["route_paths"]
     plan_id = data["plan_id"]
 
     # Verify rows persisted in SQLite
@@ -226,6 +229,8 @@ def test_get_plan_round_trip(client, monkeypatch):
     assert plan_data["latest_version"] == 1
     assert "request" in plan_data
     assert "planset" in plan_data
+    assert len(plan_data["map_points"]) == 1
+    assert "FIXTURE_m1~r0" in plan_data["route_paths"]
 
 
 def test_get_plan_trace(client, monkeypatch):
