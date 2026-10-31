@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.contracts.evidence import Evidence
+from app.contracts.inputs import PriceBand
 from app.contracts.plans import Plan, PlanDiff, PlanOption, PlanSet, ScenarioResult
 from app.engine.whynot import WhyNot, WhyNotReason, WhyNotScenario
 
@@ -266,3 +267,46 @@ def check_numbers(text: str, allowed_values: list[float], tol: float = 0.01) -> 
         if not any(abs(x - abs(v)) <= max(half_unit, tol * abs(v)) for v in allowed_values):
             bad.append(tok)
     return bad
+
+
+# ---------------------------------------------------------------- plain-language layer (additive)
+_PLAIN_GRADE: dict[str, dict[str, str]] = {
+    "hi": {
+        "ACTIONABLE": "Theek hai, bhej sakte ho",
+        "ACTIONABLE_WITH_CAVEATS": "Bhej sakte ho, par kuch baatein pata nahi (neeche dekhein)",
+        "ADVISORY_ONLY": "Dhyan se - kai baatein pata nahi, aap khud faisla lein",
+        "ABSTAIN": "Abhi salah nahi de sakte - data kaafi nahi hai",
+    },
+    "en": {
+        "ACTIONABLE": "OK to send",
+        "ACTIONABLE_WITH_CAVEATS": "OK to send, but some things are unknown",
+        "ADVISORY_ONLY": "Use caution - several things are unknown, decide yourself",
+        "ABSTAIN": "Cannot advise yet - not enough data",
+    },
+}
+
+_PRICE_SOURCE: dict[str, str] = {
+    "hi": "Yeh price {record_date} ko {market} mandi mein record hua (sarkari data.gov.in se).",
+    "en": "This price was recorded on {record_date} at {market} mandi (government data, data.gov.in).",
+}
+
+
+def _lang_table(table: dict[str, Any], lang: str) -> Any:
+    if lang not in table:
+        raise ValueError(f"unsupported lang {lang!r}; use 'hi' or 'en'")
+    return table[lang]
+
+
+def plain_grade(grade: str, lang: str = "hi") -> str:
+    """Farmer-facing sentence for a PlanSet grade. Contains no numbers."""
+    tbl = _lang_table(_PLAIN_GRADE, lang)
+    if grade not in tbl:
+        raise ValueError(f"unknown grade {grade!r}")
+    return tbl[grade]
+
+
+def price_source_line(price_band: PriceBand, lang: str = "hi", *, market: str) -> str:
+    """Where a price came from, using the band's own record_date. PriceBand carries no market name,
+    so the caller passes it (e.g. MandiCandidate name). No data fetch."""
+    tpl = _lang_table(_PRICE_SOURCE, lang)
+    return tpl.format(record_date=price_band.record_date, market=market)
