@@ -35,6 +35,7 @@ WHAT_IF_TITLE = "What-if scenario (user-set) - not observed"
 WHAT_IF_TAG = "[what_if]"
 
 
+
 def format_inr(val: float | None) -> str:
     """
     Format a rupee number using Indian numbering system:
@@ -48,14 +49,13 @@ def format_inr(val: float | None) -> str:
     except (ValueError, TypeError):
         return UNAVAILABLE
 
-    if math.isnan(num):
+    if math.isnan(num) or math.isinf(num):
         return UNAVAILABLE
 
     is_negative = num < 0
-    num = abs(num)
+    abs_int = abs(int(round(num)))
 
-    # Convert to integer string
-    s = str(int(round(num)))
+    s = str(abs_int)
     if len(s) <= 3:
         formatted = s
     else:
@@ -89,34 +89,6 @@ def format_kind_tag(kind: str | None) -> str:
     if not kind or not str(kind).strip():
         return ":red[[untagged]]"
     return f"[{kind.strip()}]"
-
-
-def tag_for(
-    value: Any = None,
-    evidence_id: str | None = None,
-    source: str | None = None,
-) -> str:
-    """
-    Format kind tag for a value:
-    - Returns '[computed]' (or format_kind_tag(source)) when source is explicitly given (e.g. source='computed').
-    - If evidence_id is given (and source is None), resolves the evidence kind via api_client if available.
-    - Returns ':red[[untagged]]' only for genuinely unexplained numbers (neither evidence_id nor source given).
-    """
-    if source and str(source).strip():
-        return format_kind_tag(source)
-
-    if evidence_id and str(evidence_id).strip():
-        from app.ui import api_client
-
-        try:
-            ev = api_client.get_evidence_cached(evidence_id.strip())
-            if ev and ev.get("kind"):
-                return format_kind_tag(ev.get("kind"))
-        except Exception:
-            pass
-        return ":red[[untagged]]"
-
-    return ":red[[untagged]]"
 
 
 def format_source_time(as_of: str | None, fetched_at: str | None) -> str:
@@ -171,3 +143,7 @@ def render_red_box_html(title: str, content: str) -> str:
         f'{content}'
         f'</div>'
     )
+
+
+
+
