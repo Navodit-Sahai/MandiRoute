@@ -63,7 +63,7 @@ class DispatchRequest(BaseModel):
     origin: LatLon
     origin_label: str
     origin_state: str
-    ripeness: RipenessStage
+    ripeness: Optional[RipenessStage] = None
     vehicle: VehicleType
     refrigerated_setpoint_c: Optional[float] = None
     loading_time: datetime                       # must be timezone-aware

@@ -75,7 +75,7 @@ class PlanOption(BaseModel):
     scenario_results: list[ScenarioResult]
     score: float
     mean_net: float
-    ripening: RipeningResult
+    ripening: Optional[RipeningResult] = None
     evidence_ids: list[str]
 
 

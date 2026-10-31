@@ -139,22 +139,27 @@ def _assemble(req: DispatchRequest, now: datetime, *, only: list[str] | None = N
             http.add_warning("no candidate mandis within range with a located, recent price record")
             return _empty(col, extra)
 
-        # ---- 3. variety / grade ----
+        # ---- 3. grade (D-A13: grade-only matching; variety is shown, not matched) ----
         pool = [rec for rec in fresh if rec.mandi_id in ids]
         if variety is None and grade is None:
-            variety, grade = mandi.select_variety_grade(pool)
-            sup = mandi.pair_support(pool)
-            http.add_warning("variety/grade chosen for comparability: " + f"{variety or '-'} / {grade or '-'}"
-                             + " (" + "; ".join(f"{v or '-'}/{g or '-'}: {n} mandi(s)" for v, g, n in sup[:4]) + ")")
+            grade = mandi.select_grade(pool)
+            sup = mandi.grade_support(pool)
+            http.add_warning("grade chosen for comparability: " + f"{grade or '-'}"
+                             + " (" + "; ".join(f"{g or '-'}: {n} mandi(s)" for g, n in sup[:4]) + "); "
+                             "variety is NOT matched - it is shown per mandi")
         groups = mandi.group_by_mandi(pool, variety, grade)
         names = {rec.mandi_id: f"{rec.market}, {rec.district}" for rec in pool}      # human-readable names for warnings
+        used_varieties = sorted({(groups[m][0].variety or "-") for m in groups})
+        if len(used_varieties) > 1:
+            http.add_warning("varieties differ across candidates (" + ", ".join(used_varieties)
+                             + ") - prices are same-grade but not strictly like-for-like")
 
         # ---- 4. candidates: location + price + closing time ----
         _note(progress, "Locating mandis")
         cands: list[CandidateInputs] = []
         for mid in ids:
             if mid not in groups:
-                http.add_warning(f"{names.get(mid, mid)}: dropped - no record for the selected variety/grade")
+                http.add_warning(f"{names.get(mid, mid)}: dropped - no record for the selected grade")
                 continue
             rep = groups[mid][0]
             try:
@@ -246,8 +251,8 @@ def refresh_for_monitoring(req: DispatchRequest, plan_option_ids: list[str], now
                            variety: str | None = None, grade: str | None = None,
                            force: bool = False) -> CandidateAssembly:
     """BLUEPRINT A7 (+ optional keyword args, additive). Re-fetches prices/weather for the mandis named in
-    `plan_option_ids` (see CONVENTION above). Pass the variety/grade stored with the plan so the comparison
-    basis cannot silently change (pass BOTH or NEITHER). Cache TTLs define "fresh" (price 60 min, weather 30 min);
+    `plan_option_ids` (see CONVENTION above). Pass the grade stored with the plan (variety normally None =
+    any) so the comparison basis cannot silently change; None means wildcard when the other is given. Cache TTLs define "fresh" (price 60 min, weather 30 min);
     force=True bypasses the price + weather caches (routes are static map data and stay cached)."""
     only = mandi_ids_from_option_ids(plan_option_ids)
     if not only:

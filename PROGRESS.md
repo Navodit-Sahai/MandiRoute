@@ -18,7 +18,7 @@
 |---|---|---|---|---|---|
 | G0 | Contracts + scaffold merged to `main`; all three streams pulled | H2 | NOT_STARTED | | |
 | G1 | API verification complete; decision D-A1 written (mandi source) | H3 | NOT_STARTED | | |
-| G2 | **Vertical slice:** `POST /plan` with live data returns A/B/C + coverage grade | H12 | NOT_STARTED | | |
+| G2 | **Vertical slice:** `POST /plan` with live data returns A/B/C + coverage grade | H12 | VERIFIED | 2026-10-31 | Live POST /plan returned 3 plans (A/B/C) with ACTIONABLE_WITH_CAVEATS grade in 39.7s |
 | G3 | **Dispatch loop:** approve → Telegram → check-in → tick → recompute → diff → approval | H24 | NOT_STARTED | | |
 | G4 | **FREEZE:** no new features; bug-fix only | H32 | NOT_STARTED | | |
 | G5 | 3 full rehearsals + failure drills passed | H36 | NOT_STARTED | | |
@@ -51,11 +51,11 @@
 | B1 | Units / time / helpers | DONE (awaiting review) | batch-1 zip | 28 tests | session-1 | `app/engine/units.py` |
 | B2 | Ripening exposure | DONE (awaiting review) | batch-1 zip | 23 tests | session-1 | Golden values pass (10.4/13.2/20.8 %, None at 26 °C, chilling_risk). Table transcribed from a search excerpt: **re-check against the original UC Davis page** |
 | B3 | Net value | DONE (awaiting review) | batch-1 zip | 16 tests | session-1 | Golden 51 200 passes; unknown costs reported in `unknown_fields`, never hidden |
-| B4 | Option evaluator + 9-scenario grid | NOT_STARTED | | | | deps B2, B3, M0 |
-| B5 | Plan builder A/B/C | NOT_STARTED | | | | deps B4 |
+| B4 | Option evaluator + 9-scenario grid | DONE (awaiting review) | stream-b | 8 golden tests | 2026-10-31 | `app/engine/scenarios.py`; 9 scenarios, CVaR25/mean score, ripening=None |
+| B5 | Plan builder A/B/C | DONE (awaiting review) | stream-b | 6 golden tests | 2026-10-31 | `app/engine/plans.py`; A/B/C selection, Fail(A) hedge, robustness, C departure slots |
 | B6 | Commitment points | NOT_STARTED | | | | deps B4 |
 | B7 | Flip boundaries | NOT_STARTED | | | | deps B4, B6 |
-| B8 | Coverage grader | NOT_STARTED | | | | deps M0 |
+| B8 | Coverage grader | DONE (awaiting review) | stream-b | 8 tests | session-B8 | `app/engine/coverage.py`; ripening omitted unless `ripening_enabled` |
 | B9 | Triggers / hysteresis / recompute / diff | NOT_STARTED | | | | deps B5–B8 |
 | B9b | Template explainer + number check | NOT_STARTED | | | | deps B5, B9 |
 | B10 | Backtest harness (P1) | NOT_STARTED | | | | deps A8, B5 |
@@ -63,7 +63,7 @@
 ### Stream C — Agent, API, Telegram, UI
 | ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
 |---|---|---|---|---|---|---|
-| C1 | FastAPI + DB wiring + dev stubs | NOT_STARTED | | | | deps M0 |
+| C1 | FastAPI + DB wiring + dev stubs | DONE (awaiting review) | stream-b | 11 tests | 2026-10-31 | `app/api/main.py`, `app/agent/flow.py`; live POST /plan returns A/B/C in 39.7s |
 | C2 | Telegram integration | NOT_STARTED | | | | deps M0; live-location only if A1 verifies |
 | C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
 | C4 | Watchdog | NOT_STARTED | | | | deps C1, C3, B9 |
@@ -199,3 +199,53 @@ Contracts version: **v1.0** (text in BLUEPRINT §1).
 - Next module for this stream: B4.
 
 <!-- Append new entries below using the HANDOFF BLOCK format from AGENT.md §9.3 -->
+
+
+### 2026-10-31 · Stream A · session #5 · D-A13 grade-only matching + tzdata · status IN_PROGRESS
+- Human decisions recorded: approve 24h cuts; grade-only matching (D-A13); tzdata dependency added; Telegram token: human creating.
+- D-A13: `app/data/mandi.py` adds `select_grade`, `grade_support`; `group_by_mandi` now treats None as wildcard; `assemble.py` selects by GRADE, shows variety per mandi, warns "varieties differ". `selected_variety` is now None by default; pin grade for monitoring (`refresh_for_monitoring(..., grade=...)`).
+- Tests: 114 passed in Stream A sandbox (mocked). NOT yet run against the merged repo (contracts/config there differ from the temp copies Stream A used).
+- Security: `t.py` (diagnostic with a real key) was committed -> human to remove + rotate key. `check_apis.py` is in repo (not seen by Stream A).
+- Add `tzdata>=2024.1` to requirements.txt (engine B1 uses zoneinfo("Asia/Kolkata"); fails on Windows without it).
+## Paste into PROGRESS.md
+
+### §9 Scope Requests
+| SR-1 | 2026-10-31 | Remove tomato ripening exposure from the MVP (24 h left) | Human: approved | Keeps code (flag-guarded), removes dependency |
+Effects: engine B4/B5/B8/B9/B9b skip ripening; UI hides it; contract fields become Optional; trigger T4 disabled. Remaining product value: A/B/C plans under delay + price scenarios, window feasibility, rain exposure, flip boundaries, commitment points, hysteresis replan with diff, evidence ledger.
+Honest note: ripening was the crop-specific part of the pitch. Do not describe the product as tomato-quality or spoilage aware.
+
+### §6 CR-5 (needs merge FIRST)  
+`PlanOption.ripening` -> Optional (default None); `DispatchRequest.ripeness` -> Optional (default None); `Settings.ripening_enabled=False`. Back-compat: additive for readers, B/C must handle None.
+
+### Session log (Stream A)
+- No Stream A change needed: assembler never used ripening. Destination weather (used only for ripening) is still fetched; C may ignore it.
+
+### 2026-10-31 · Stream B · session-B8 · B8 coverage grader · status DONE (pending review)
+- Files: `app/engine/coverage.py`, `tests/engine/test_coverage.py`. Tests: 8 passed (`tests/engine/test_coverage.py`).
+- Assumptions: a dimension is a caveat if ANY priced+routable candidate is affected (detail names mandis); price age = calendar days `now.date() - record_date`; ABSTAIN returns `items=[]`, reasons filled. Kinds: price/unit=observed, weather=forecast, closing/deductions=user_input, location=computed. `evidence` arg accepted but unused.
+- Ripening (SR-1): item omitted when `settings.ripening_enabled` is False; when enabled it only checks the ripeness stage was given.
+- Blocker: `ruff` not installed in this env (not run). Next module: B4.
+
+### 2026-10-31 · Stream B · session-B4 · B4 option evaluator & scenario grid · status DONE (pending review)
+- Module: B4 (`evaluate_option`, `option_sort_key`, `sort_options`).
+- Files: `app/engine/scenarios.py`, `app/engine/__init__.py`, `tests/engine/test_scenarios.py`.
+- Tests run: 83 passed in `tests/engine/` (8 golden tests in `test_scenarios.py`); 224 passed full suite (`pytest -q --tb=short`).
+- Assumptions: 27 environmental combinations collapse to 9 money scenarios; missed window adds `NEXT_DAY_WAIT_H * hold_cost_per_hour` with constant price level; closing time falls back from `cand.latest_arrival_local` to `req.mandi_latest_arrival`; rain exposure sums valid precipitation samples along route; ripening sets `ripening=None` without calling ripening when `ripening_enabled` is False.
+- Blockers: None. Next module: B5 (Plan builder A/B/C).
+
+- [A1 human run 2026-10-31] Telegram bot @MandiSarthi_bot: sendMessage, inline buttons and callback_query (data a|test) VERIFIED, private chat only. Live-location edits: UNKNOWN (P1, not needed; check-in buttons used).
+
+### 2026-10-31 · Stream B · session-B5 · B5 plan builder A/B/C · status DONE (pending review)
+- Module: B5 (`build_plan_set`).
+- Files: `app/engine/plans.py`, `app/engine/__init__.py`, `tests/engine/test_plans.py`.
+- Tests run: 101 passed in `tests/engine/` (6 golden tests in `test_plans.py`); 242 passed full suite (`pytest -q --tb=short`).
+- Assumptions: Ripening OFF (no ripening eligibility filter, no staging-ripening, no ripening reconsider_if); option_id strictly formatted as `{mandi_id}::{route_id}::{depart_iso}`; Plan B chooses best mean Net over Fail(A) scenarios, or standby when Fail(A) is empty; Plan C evaluates departure slots from config with hold cost; ABSTAIN when no priced candidates or coverage grade is ABSTAIN.
+- Blockers: None. Next module: B6 / B7 / B9.
+
+### 2026-10-31 · Stream C · session-C1 · C1 minimal FastAPI app + C3-lite flow · status DONE (pending review)
+- Module: C1 (FastAPI app, routes, persistence, dev_stubs) + C3-lite (plain state-machine flow).
+- Files: `app/api/{main,deps,stubs,__init__}.py`, `app/agent/{flow,__init__}.py`, `tests/api/{test_api,__init__}.py`, `tests/agent/{test_flow,__init__}.py`.
+- Endpoints: `GET /health`, `GET /sources/health`, `GET /assumptions`, `POST /plan`, `GET /plans/{id}`, `GET /plans/{id}/trace`, `GET /evidence/{id}`.
+- Tests run: 11 passed in `tests/api` & `tests/agent`; 253 passed full suite (`pytest -q --tb=short`).
+- Live Verification: Gate G2 passed. Live `POST /plan` with Pune, Maharashtra origin returned status `awaiting_approval`, coverage `ACTIONABLE_WITH_CAVEATS`, and 3 plans (Plan A: APMC Panvel, Plan B: Pune(Pimpri), Plan C: APMC Panvel +2h) in 39.7s.
+- Blockers: None. Next module: C2 (Telegram integration) or C5 (Streamlit UI).

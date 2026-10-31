@@ -73,3 +73,27 @@ def test_planset_schema_builds_and_defaults_work():
     ev = Evidence(id="ev_00000000", kind=Kind.OBSERVED, label="x", source="test", fetched_at="2030-01-01T00:00:00Z")
     assert ev.stale is False
     CoverageReport(grade="ABSTAIN", items=[], reasons=[])
+
+
+def test_cr5_ripeness_optional():
+    req = make_request(ripeness=None)
+    assert req.ripeness is None
+
+
+def test_cr5_plan_option_ripening_optional():
+    from app.contracts import PlanOption
+    po = PlanOption(
+        option_id="opt_1",
+        mandi_id="m1",
+        mandi_name="Mandi 1",
+        route_id="r1",
+        depart_iso="2030-01-01T05:00:00Z",
+        distance_km=100.0,
+        duration_h_nominal=2.5,
+        rain_exposure_mm=None,
+        scenario_results=[],
+        score=1000.0,
+        mean_net=1200.0,
+        evidence_ids=[],
+    )
+    assert po.ripening is None

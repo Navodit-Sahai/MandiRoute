@@ -294,7 +294,7 @@ def _vg(rec: MandiRecord) -> tuple[str, str]:
 
 
 def select_variety_grade(records: list[MandiRecord]) -> tuple[str | None, str | None]:
-    """Pair (variety, grade) present in the MOST distinct mandis; tie -> alphabetical. Deterministic.
+    """(Strict matching - NOT used by the assembler since D-A13; kept for tests/optional use.) Pair (variety, grade) present in the MOST distinct mandis; tie -> alphabetical. Deterministic.
     Only non-suspect records count. Returns the original spelling (smallest spelling for that pair)."""
     pairs: dict[tuple[str, str], set[str]] = {}
     spelling: dict[tuple[str, str], tuple[str | None, str | None]] = {}
@@ -322,12 +322,36 @@ def pair_support(records: list[MandiRecord]) -> list[tuple[str | None, str | Non
     return [(v, g, len(s)) for _, (v, g, s) in sorted(out.items(), key=lambda kv: (-len(kv[1][2]), kv[0]))]
 
 
+def select_grade(records: list[MandiRecord]) -> str | None:
+    """D-A13: compare on GRADE only. Grade present in the MOST distinct mandis; tie -> alphabetical.
+    (Variety labels such as Local/Other/Deshi are used inconsistently across mandis, so variety is NOT matched.)"""
+    sup = grade_support(records)
+    return sup[0][0] if sup else None
+
+
+def grade_support(records: list[MandiRecord]) -> list[tuple[str | None, int]]:
+    by: dict[str, tuple[str | None, set[str]]] = {}
+    for r in sorted((x for x in records if not x.suspect), key=lambda x: (x.mandi_id, x.grade or "")):
+        k = norm(r.grade)
+        cur = by.get(k)
+        if cur is None:
+            by[k] = (r.grade, {r.mandi_id})
+        else:
+            cur[1].add(r.mandi_id)
+            if (r.grade or "") < (cur[0] or ""):
+                by[k] = (r.grade, cur[1])
+    return [(g, len(m)) for _, (g, m) in sorted(by.items(), key=lambda kv: (-len(kv[1][1]), kv[0]))]
+
+
 def group_by_mandi(records: list[MandiRecord], variety: str | None, grade: str | None) -> dict[str, list[MandiRecord]]:
-    want = (norm(variety), norm(grade))
+    """None = wildcard (match any). Pass variety=None to ignore variety (default policy, D-A13)."""
+    wv = None if variety is None else norm(variety)
+    wg = None if grade is None else norm(grade)
     g: dict[str, list[MandiRecord]] = {}
     for r in records:
-        if not r.suspect and _vg(r) == want:
-            g.setdefault(r.mandi_id, []).append(r)
+        if r.suspect or (wv is not None and norm(r.variety) != wv) or (wg is not None and norm(r.grade) != wg):
+            continue
+        g.setdefault(r.mandi_id, []).append(r)
     return g
 
 
