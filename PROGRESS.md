@@ -272,4 +272,12 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - Screen 2 `2_Compare.py`: PyDeck map with origin, candidate mandis (color-coded A/B/C), and route paths. Plan cards A/B/C with role note, 9-scenario net ranges via `format_inr`, nominal travel time (`TRAVEL_TIME_LABEL`), rain exposure, window status (`WINDOW_UNKNOWN_LABEL` when closing unknown), flip boundaries (`NO_FLIP_LABEL`), commitment points (`COMMIT_APPROX_TEMPLATE`), reconsider-if list, robustness count (`ROBUSTNESS_TEMPLATE`), coverage grade with reasons, and evidence ledger links to `GET /evidence/{id}`. Normal ABSTAIN handling.
 - Compliance: AGENT §7 wording checked (`scan_forbidden_words`), no direct engine/data imports from `app/ui`.
 - Tests run: 18 passed in `tests/ui`, `tests/api`, `tests/agent`; 260 passed full test suite (`pytest -q --tb=short`).
-- Next module for Stream C: C5 Part 2 (Dispatch & Monitor screen) / C4 (Watchdog) / C2 (Telegram).
+### 2026-10-31 · Stream C · session-C5-fixes · UI fixes (evidence kind tags, source strip, demo defaults, closing re-plan, data notes) · status DONE (pending review)
+- Fixes in `app/ui/format.py`, `app/ui/api_client.py`, `app/ui/pages/1_Plan.py`, `app/ui/pages/2_Compare.py`:
+  1. Evidence kind tags: fetched from `GET /evidence/{id}` (cached). Travel time and distance are `[computed]`; unevidenced numbers show `:red[[untagged]]`. Cost inputs show `[user_input]`.
+  2. Source status strip: shows exact source NAME as heading (`datagov_agmarknet`, `open_meteo_forecast`, `open_meteo_flood`, `osrm`, `open_meteo_geocoding`, `nominatim`), ok/failed, kind tag, `as_of` or `fetched <timestamp>`, failed notes, and mandi note ("daily records, not real-time").
+  3. Cost inputs: demo defaults caption added, one-click "Clear deductions" button unticks all include checkboxes.
+  4. Closing times re-plan: verified and captioned ("Closing time is a user input; leave blank if unknown.").
+  5. Compare page: collapsed "Data notes" box for warnings; location precision shown for all candidates ("market" or "district centroid (approximate)").
+- Tests: 22 passed in `tests/ui` and `tests/api`. Live browser/curl verification for Pune returned status `awaiting_approval` with 8 candidate mandis.
+

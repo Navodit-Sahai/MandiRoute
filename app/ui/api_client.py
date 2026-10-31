@@ -58,3 +58,17 @@ def get_evidence(evidence_id: str) -> dict[str, Any]:
     resp.raise_for_status()
     return resp.json()
 
+
+_EVIDENCE_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def get_evidence_cached(evidence_id: str) -> dict[str, Any]:
+    """Fetch evidence by ID with in-memory caching."""
+    if evidence_id not in _EVIDENCE_CACHE:
+        try:
+            _EVIDENCE_CACHE[evidence_id] = get_evidence(evidence_id)
+        except Exception:
+            _EVIDENCE_CACHE[evidence_id] = {}
+    return _EVIDENCE_CACHE[evidence_id]
+
+

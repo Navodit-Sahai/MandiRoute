@@ -65,3 +65,35 @@ def test_scan_forbidden_words_detects_violations():
     assert "ai-optimised profit" in matches
     assert "spoilage" in matches
 
+
+def test_format_kind_tag():
+    from app.ui.format import format_kind_tag
+
+    assert format_kind_tag("observed") == "[observed]"
+    assert format_kind_tag("computed") == "[computed]"
+    assert format_kind_tag("forecast") == "[forecast]"
+    assert format_kind_tag("proxy") == "[proxy]"
+    assert format_kind_tag("user_input") == "[user_input]"
+    assert format_kind_tag(None) == ":red[[untagged]]"
+    assert format_kind_tag("") == ":red[[untagged]]"
+    assert format_kind_tag("   ") == ":red[[untagged]]"
+
+
+def test_format_source_time():
+    from app.ui.format import format_source_time
+
+    assert format_source_time("2026-10-31", None) == "2026-10-31"
+    assert format_source_time("2026-10-31", "2026-10-31T15:00:00+00:00") == "2026-10-31"
+    assert format_source_time(None, "2026-10-31T15:00:00+00:00") == "fetched 2026-10-31T15:00:00+00:00"
+    assert format_source_time(None, None) == "unknown"
+
+
+def test_format_location_precision():
+    from app.ui.format import format_location_precision
+
+    assert format_location_precision("market") == "market"
+    assert format_location_precision("district_centroid") == "district centroid (approximate)"
+    assert format_location_precision(None) == "unknown"
+    assert format_location_precision("") == "unknown"
+
+

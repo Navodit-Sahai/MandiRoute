@@ -77,6 +77,46 @@ def unavailable_if_none(val: Any) -> str:
     return str(val)
 
 
+def format_kind_tag(kind: str | None) -> str:
+    """
+    Format a kind tag from an evidence record:
+    e.g. 'observed' -> '[observed]', 'computed' -> '[computed]'.
+    If kind is None, empty, or missing: returns ':red[[untagged]]' (never a guessed tag).
+    """
+    if not kind or not str(kind).strip():
+        return ":red[[untagged]]"
+    return f"[{kind.strip()}]"
+
+
+def format_source_time(as_of: str | None, fetched_at: str | None) -> str:
+    """
+    Format source timestamp:
+    returns as_of if available, else f'fetched {fetched_at}', else 'unknown'.
+    """
+    if as_of and str(as_of).strip():
+        return str(as_of).strip()
+    if fetched_at and str(fetched_at).strip():
+        return f"fetched {str(fetched_at).strip()}"
+    return "unknown"
+
+
+def format_location_precision(precision: str | None) -> str:
+    """
+    Format candidate location precision:
+    'market' -> 'market'
+    'district_centroid' -> 'district centroid (approximate)'
+    None/empty -> 'unknown'
+    """
+    if not precision:
+        return "unknown"
+    p = str(precision).strip().lower()
+    if p == "market":
+        return "market"
+    if p == "district_centroid":
+        return "district centroid (approximate)"
+    return str(precision)
+
+
 def scan_forbidden_words(text: str) -> list[str]:
     """Scan text for any prohibited marketing or hallucinated claims from AGENT.md §7."""
     lowered = text.lower()
@@ -85,4 +125,6 @@ def scan_forbidden_words(text: str) -> list[str]:
         if phrase in lowered:
             found.append(phrase)
     return found
+
+
 

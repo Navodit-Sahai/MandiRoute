@@ -53,3 +53,24 @@ def test_ui_does_not_import_engine_or_data():
                     assert not node.module.startswith("app.data"), f"{f} imports data directly: {node.module}"
                     assert not node.module.startswith("app.db"), f"{f} imports db directly: {node.module}"
 
+
+def test_ui_entry_file_is_home():
+    assert Path("app/ui/home.py").exists(), "app/ui/home.py must exist as UI entry point"
+    assert not Path("app/ui/app.py").exists(), "app/ui/app.py must NOT exist"
+
+
+def test_ui_screens_required_elements():
+    plan_code = Path("app/ui/pages/1_Plan.py").read_text(encoding="utf-8")
+    assert "Re-plan with closing times" in plan_code
+    assert "Clear deductions" in plan_code
+    assert "Demo defaults (user input, not observed). Replace with your actual rates." in plan_code
+    assert "Closing time is a user input; leave blank if unknown." in plan_code
+    assert "format_source_time" in plan_code
+
+    compare_code = Path("app/ui/pages/2_Compare.py").read_text(encoding="utf-8")
+    assert "Data notes" in compare_code
+    assert "format_location_precision" in compare_code
+    assert "format_kind_tag" in compare_code
+    assert "[user_input]" in compare_code
+
+
