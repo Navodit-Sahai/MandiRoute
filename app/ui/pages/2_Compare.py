@@ -426,4 +426,10 @@ for idx, plan in enumerate(plans):
 
 st.markdown("---")
 
+summary_text = plan_res.get("summary")
+if summary_text:
+    st.subheader("Plain-language summary (template, numbers checked)")
+    st.text(summary_text)
+
 # TODO: "Why not the highest-price mandi?" - engine function not yet available
+

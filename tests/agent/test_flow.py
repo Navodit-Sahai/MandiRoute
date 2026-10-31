@@ -90,7 +90,8 @@ def test_flow_execution_and_trace(monkeypatch):
     assert res.plan_id == "test_p1"
     assert res.status == "awaiting_approval"
     assert len(res.planset.plans) >= 1
-    assert res.summary is None  # explainer module not present
+    assert res.summary is not None
+    assert isinstance(res.summary, str) and len(res.summary) > 0
 
     # Verify agent_trace rows
     with get_conn() as conn:
@@ -98,7 +99,7 @@ def test_flow_execution_and_trace(monkeypatch):
         assert len(rows) <= 12  # Step cap 12
         assert len(rows) >= 5
         steps = [r["node"] for r in rows]
-        assert steps == ["intake", "source_gate", "assemble", "decide", "geo", "explain", "done"]
+        assert steps == ["intake", "source_gate", "assemble", "assembly_meta", "decide", "geo", "explain", "done"]
         for r in rows:
             assert r["ok"] == 1
         assert len(res.map_points) == 1

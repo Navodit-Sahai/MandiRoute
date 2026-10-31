@@ -138,6 +138,23 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     )
     step_num += 1
 
+    # 3b. Assembly metadata: persist selected grade and variety
+    meta_json = json.dumps({
+        "selected_grade": assembly.selected_grade,
+        "selected_variety": assembly.selected_variety,
+    })
+    _record_trace(
+        plan_id=plan_id,
+        step=step_num,
+        node="assembly_meta",
+        tool=None,
+        args_json="{}",
+        result_summary=meta_json,
+        ok=True,
+        ts=ts_now,
+    )
+    step_num += 1
+
     # 4. Decide: Build plan set using decision engine (ONE call)
     decide_args = json.dumps({"candidate_count": len(assembly.candidates), "risk_mode": req.risk_mode})
     planset: PlanSet = build_plan_set(
@@ -193,23 +210,50 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     )
     step_num += 1
 
-    # 6. Explain: Render summary if explainer module exists
+    # 6. Explain: Render summary and check numbers
     summary: Optional[str] = None
     explain_summary = "Explainer not installed, summary=None"
     try:
-        from app.explain import render_plan_summary  # type: ignore[import-not-found]
-        evidence_index = {e.id: e for e in assembly.evidence}
-        summary = render_plan_summary(planset, evidence_index)
-        explain_summary = "Plan summary rendered"
-    except ImportError:
+        from app.contracts.evidence import Evidence
+        from app.db.db import get_evidence
+        from app.explain import allowed_values, check_numbers, render_plan_summary
+
+        all_ev_ids = set(planset.evidence_ids)
+        for p in planset.plans:
+            all_ev_ids.update(p.option.evidence_ids)
+
+        evidence_index: dict[str, Evidence] = {}
+        for eid in all_ev_ids:
+            row = get_evidence(eid)
+            if row:
+                try:
+                    evidence_index[eid] = Evidence.model_validate(row)
+                except Exception:
+                    pass
+        for ev in assembly.evidence:
+            if ev.id not in evidence_index:
+                evidence_index[ev.id] = ev
+
+        text = render_plan_summary(planset, evidence_index)
+        allowed = allowed_values(planset, evidence_index)
+        bad_numbers = check_numbers(text, allowed)
+        if bad_numbers:
+            summary = None
+            assembly.warnings.append("summary withheld: number check failed")
+            explain_summary = f"summary withheld: number check failed ({bad_numbers})"
+        else:
+            summary = text
+            explain_summary = "Plan summary rendered and verified"
+    except Exception as exc:
         summary = None
+        explain_summary = f"Explainer error: {exc}"
 
     _record_trace(
         plan_id=plan_id,
         step=step_num,
         node="explain",
         tool="app.explain.render_plan_summary" if summary else None,
-        args_json="{}",
+        args_json=json.dumps({"summary": summary}),
         result_summary=explain_summary,
         ok=True,
         ts=ts_now,

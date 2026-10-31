@@ -66,7 +66,7 @@
 | C1 | FastAPI + DB wiring + dev stubs | DONE (awaiting review) | stream-b | 11 tests | 2026-10-31 | `app/api/main.py`, `app/agent/flow.py`; live POST /plan returns A/B/C in 39.7s |
 | C2 | Telegram integration | NOT_STARTED | | | | deps M0; live-location only if A1 verifies |
 | C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
-| C4 | Watchdog | NOT_STARTED | | | | deps C1, C3, B9 |
+| C4 | Watchdog + monitoring endpoints | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | `app/agent/watchdog.py`, `app/api/main.py`; tick, progress, approve, notify, diff endpoints |
 | C5 (Part 1) | Streamlit UI (Plan & Compare screens) | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | Screens 1 & 2 done; PyDeck map, A/B/C cards, format_inr, no forbidden words |
 | C6 | What-if + Flip Finder (P1) | NOT_STARTED | | | | |
 | C7 | E2E tests + rehearsal | NOT_STARTED | | | | |
@@ -280,4 +280,17 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   4. Closing times re-plan: verified and captioned ("Closing time is a user input; leave blank if unknown.").
   5. Compare page: collapsed "Data notes" box for warnings; location precision shown for all candidates ("market" or "district centroid (approximate)").
 - Tests: 22 passed in `tests/ui` and `tests/api`. Live browser/curl verification for Pune returned status `awaiting_approval` with 8 candidate mandis.
+
+### 2026-10-31 · Stream C · session-C4-watchdog · Explainer wiring + C4 Watchdog & Monitoring Endpoints · status DONE (pending review)
+- Part 0 (Explainer wiring):
+  - Updated `app/agent/flow.py`: persisted `assembly_meta` trace node `{selected_grade, selected_variety}`; wired explain step with `render_plan_summary(planset, evidence_index)` and `check_numbers(summary, allowed_values(...))`; drops text with warning if number check fails.
+  - Returned `summary` in `POST /plan` and `GET /plans/{id}`. Displayed in `2_Compare.py` under cards in box titled "Plain-language summary (template, numbers checked)".
+  - Updated `tests/agent/test_flow.py` asserting non-empty summary string and `assembly_meta` trace node.
+- Part 1 (C4 Watchdog & Endpoints):
+  - Created `app/integrations/notify.py`: `notify(plan_id, kind, text, buttons)` logs to `actions` table.
+  - Created `app/agent/watchdog.py`: `tick_plan` with per-plan locking, refresh with pinned grade, `evaluate_triggers_and_recompute`, persistence to `watch_events`, `watch_state`, `plan_versions`, notification on replan proposal, and `diff_text = render_diff(diff, evidence_index)`. Background daemon thread enabled when `MG_WATCHDOG=1` in FastAPI lifespan.
+  - Endpoints in `app/api/main.py`: `POST /plans/{id}/approve` (enforcing valid dispatch/replan state transitions and 409 conflict checks), `POST /plans/{id}/progress` (parsing delay:30/60, passed:wp, manual ETA), `POST /plans/{id}/watch/tick` (?fresh=1 query support), and `GET /plans/{id}/diff` (PlanDiff + diff_text).
+- Tests: 30 passed in `tests/api`, `tests/agent`, `tests/ui` (including `test_watchdog_endpoints.py` covering approve/reject/409, progress, tick, diff, hysteresis, cooldown, no-fresh-data degradation, lock serialization, exception resilience).
+- Verification: live Pune plan `e523b823` exercised through approve (`monitoring`), progress #1 (`reported_delay_min: 60.0`), tick #1, progress #2, and tick #2.
+
 
