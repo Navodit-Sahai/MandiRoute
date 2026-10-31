@@ -18,7 +18,7 @@
 |---|---|---|---|---|---|
 | G0 | Contracts + scaffold merged to `main`; all three streams pulled | H2 | NOT_STARTED | | |
 | G1 | API verification complete; decision D-A1 written (mandi source) | H3 | NOT_STARTED | | |
-| G2 | **Vertical slice:** `POST /plan` with live data returns A/B/C + coverage grade | H12 | NOT_STARTED | | |
+| G2 | **Vertical slice:** `POST /plan` with live data returns A/B/C + coverage grade | H12 | VERIFIED | 2026-10-31 | Live POST /plan returned 3 plans (A/B/C) with ACTIONABLE_WITH_CAVEATS grade in 39.7s |
 | G3 | **Dispatch loop:** approve → Telegram → check-in → tick → recompute → diff → approval | H24 | NOT_STARTED | | |
 | G4 | **FREEZE:** no new features; bug-fix only | H32 | NOT_STARTED | | |
 | G5 | 3 full rehearsals + failure drills passed | H36 | NOT_STARTED | | |
@@ -63,7 +63,7 @@
 ### Stream C — Agent, API, Telegram, UI
 | ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
 |---|---|---|---|---|---|---|
-| C1 | FastAPI + DB wiring + dev stubs | NOT_STARTED | | | | deps M0 |
+| C1 | FastAPI + DB wiring + dev stubs | DONE (awaiting review) | stream-b | 11 tests | 2026-10-31 | `app/api/main.py`, `app/agent/flow.py`; live POST /plan returns A/B/C in 39.7s |
 | C2 | Telegram integration | NOT_STARTED | | | | deps M0; live-location only if A1 verifies |
 | C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
 | C4 | Watchdog | NOT_STARTED | | | | deps C1, C3, B9 |
@@ -241,3 +241,11 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Tests run: 101 passed in `tests/engine/` (6 golden tests in `test_plans.py`); 242 passed full suite (`pytest -q --tb=short`).
 - Assumptions: Ripening OFF (no ripening eligibility filter, no staging-ripening, no ripening reconsider_if); option_id strictly formatted as `{mandi_id}::{route_id}::{depart_iso}`; Plan B chooses best mean Net over Fail(A) scenarios, or standby when Fail(A) is empty; Plan C evaluates departure slots from config with hold cost; ABSTAIN when no priced candidates or coverage grade is ABSTAIN.
 - Blockers: None. Next module: B6 / B7 / B9.
+
+### 2026-10-31 · Stream C · session-C1 · C1 minimal FastAPI app + C3-lite flow · status DONE (pending review)
+- Module: C1 (FastAPI app, routes, persistence, dev_stubs) + C3-lite (plain state-machine flow).
+- Files: `app/api/{main,deps,stubs,__init__}.py`, `app/agent/{flow,__init__}.py`, `tests/api/{test_api,__init__}.py`, `tests/agent/{test_flow,__init__}.py`.
+- Endpoints: `GET /health`, `GET /sources/health`, `GET /assumptions`, `POST /plan`, `GET /plans/{id}`, `GET /plans/{id}/trace`, `GET /evidence/{id}`.
+- Tests run: 11 passed in `tests/api` & `tests/agent`; 253 passed full suite (`pytest -q --tb=short`).
+- Live Verification: Gate G2 passed. Live `POST /plan` with Pune, Maharashtra origin returned status `awaiting_approval`, coverage `ACTIONABLE_WITH_CAVEATS`, and 3 plans (Plan A: APMC Panvel, Plan B: Pune(Pimpri), Plan C: APMC Panvel +2h) in 39.7s.
+- Blockers: None. Next module: C2 (Telegram integration) or C5 (Streamlit UI).
