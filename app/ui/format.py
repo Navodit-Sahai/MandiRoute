@@ -91,6 +91,34 @@ def format_kind_tag(kind: str | None) -> str:
     return f"[{kind.strip()}]"
 
 
+def tag_for(
+    value: Any = None,
+    evidence_id: str | None = None,
+    source: str | None = None,
+) -> str:
+    """
+    Format kind tag for a value:
+    - Returns '[computed]' (or format_kind_tag(source)) when source is explicitly given (e.g. source='computed').
+    - If evidence_id is given (and source is None), resolves the evidence kind via api_client if available.
+    - Returns ':red[[untagged]]' only for genuinely unexplained numbers (neither evidence_id nor source given).
+    """
+    if source and str(source).strip():
+        return format_kind_tag(source)
+
+    if evidence_id and str(evidence_id).strip():
+        from app.ui import api_client
+
+        try:
+            ev = api_client.get_evidence_cached(evidence_id.strip())
+            if ev and ev.get("kind"):
+                return format_kind_tag(ev.get("kind"))
+        except Exception:
+            pass
+        return ":red[[untagged]]"
+
+    return ":red[[untagged]]"
+
+
 def format_source_time(as_of: str | None, fetched_at: str | None) -> str:
     """
     Format source timestamp:
