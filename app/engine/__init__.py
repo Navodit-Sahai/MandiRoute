@@ -7,7 +7,11 @@ from app.engine.flips import compute_flips
 from app.engine.netvalue import net_breakdown, net_value
 from app.engine.plans import build_plan_set
 from app.engine.scenarios import evaluate_option, option_sort_key, sort_options
-from app.engine.triggers import TriggerDecision, WatchState, evaluate_triggers_and_recompute
+from app.engine.triggers import (
+    TriggerDecision,
+    WatchState,
+    evaluate_triggers_and_recompute,
+)
 from app.engine.units import (
     delayed_arrival,
     hours_to_seconds,
@@ -18,17 +22,23 @@ from app.engine.units import (
     to_local,
     window_status,
 )
+from app.engine.whynot import WhyNot, WhyNotReason, WhyNotScenario, why_not_highest
 
 __all__ = [
+    "TriggerDecision",
+    "WatchState",
+    "WhyNot",
+    "WhyNotReason",
+    "WhyNotScenario",
+    "build_plan_set",
     "compute_commit_points",
     "compute_flips",
-    "last_feasible_waypoint",
-    "build_plan_set",
     "delayed_arrival",
     "evaluate_option",
     "evaluate_triggers_and_recompute",
     "grade_coverage",
     "hours_to_seconds",
+    "last_feasible_waypoint",
     "lowest_k_count",
     "mean_of_lowest",
     "net_breakdown",
@@ -38,7 +48,6 @@ __all__ = [
     "seconds_to_hours",
     "sort_options",
     "to_local",
-    "TriggerDecision",
-    "WatchState",
+    "why_not_highest",
     "window_status",
 ]

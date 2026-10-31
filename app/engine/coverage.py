@@ -13,7 +13,12 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from app.contracts import CandidateInputs, CoverageItem, CoverageReport, DispatchRequest, Evidence, Kind
+from app.contracts import CandidateInputs, CoverageItem, CoverageReport, DispatchRequest, Evidence, Kind, PriceBand
+
+
+def usable_price(band: PriceBand | None) -> bool:
+    """A price band the engine can use: present and every level positive (Rs/qtl)."""
+    return band is not None and min(band.low, band.typical, band.high) > 0
 
 
 def _age_days(record_date: str, now: datetime) -> int:
@@ -43,12 +48,13 @@ def _item(dimension: str, kind: Kind, bad: list[str], bad_status: str, ok_detail
 
 def grade_coverage(req: DispatchRequest, cands: list[CandidateInputs], evidence: list[Evidence],
                    now: datetime, cfg) -> CoverageReport:
-    priced = [c for c in cands if c.price is not None]
+    # sorted by mandi_id so caveat text never depends on input order; non-positive prices are unusable
+    priced = sorted((c for c in cands if usable_price(c.price)), key=lambda c: c.mandi_id)
     usable = [c for c in priced if _usable(c)]
 
     abstain: list[str] = []
     if not priced:
-        abstain.append("no candidate mandi has a price record")
+        abstain.append("no candidate mandi has a usable price record")
     else:
         newest_age = min(_age_days(c.price.record_date, now) for c in priced)
         if newest_age > cfg.price_abstain_days:

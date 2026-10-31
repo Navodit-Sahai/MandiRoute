@@ -6,7 +6,8 @@ from app.explain.templates import (
     number_tokens,
     render_diff,
     render_plan_summary,
+    render_why_not,
 )
 
 __all__ = ["FORBIDDEN_PHRASES", "allowed_values", "check_numbers", "number_tokens", "render_diff",
-           "render_plan_summary"]
+           "render_plan_summary", "render_why_not"]
