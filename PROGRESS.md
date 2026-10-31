@@ -55,7 +55,7 @@
 | B5 | Plan builder A/B/C | NOT_STARTED | | | | deps B4 |
 | B6 | Commitment points | NOT_STARTED | | | | deps B4 |
 | B7 | Flip boundaries | NOT_STARTED | | | | deps B4, B6 |
-| B8 | Coverage grader | NOT_STARTED | | | | deps M0 |
+| B8 | Coverage grader | DONE (awaiting review) | stream-b | 8 tests | session-B8 | `app/engine/coverage.py`; ripening omitted unless `ripening_enabled` |
 | B9 | Triggers / hysteresis / recompute / diff | NOT_STARTED | | | | deps B5–B8 |
 | B9b | Template explainer + number check | NOT_STARTED | | | | deps B5, B9 |
 | B10 | Backtest harness (P1) | NOT_STARTED | | | | deps A8, B5 |
@@ -219,3 +219,9 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 
 ### Session log (Stream A)
 - No Stream A change needed: assembler never used ripening. Destination weather (used only for ripening) is still fetched; C may ignore it.
+
+### 2026-10-31 · Stream B · session-B8 · B8 coverage grader · status DONE (pending review)
+- Files: `app/engine/coverage.py`, `tests/engine/test_coverage.py`. Tests: 8 passed (`tests/engine/test_coverage.py`).
+- Assumptions: a dimension is a caveat if ANY priced+routable candidate is affected (detail names mandis); price age = calendar days `now.date() - record_date`; ABSTAIN returns `items=[]`, reasons filled. Kinds: price/unit=observed, weather=forecast, closing/deductions=user_input, location=computed. `evidence` arg accepted but unused.
+- Ripening (SR-1): item omitted when `settings.ripening_enabled` is False; when enabled it only checks the ripeness stage was given.
+- Blocker: `ruff` not installed in this env (not run). Next module: B4.
