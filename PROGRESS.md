@@ -1,165 +1,201 @@
-# PROGRESS.md — MandiGuard shared memory (read order: AGENT.md → PLAN.md → BLUEPRINT.md → PROGRESS.md)
+# PROGRESS.md — MandiGuard shared state (the team's memory)
 
-> **UPDATE PROTOCOL (every agent, every session):**
-> 1. At start: read this file fully; claim your module (status `IN_PROGRESS`, stream, timestamp).
-> 2. At end: update ONLY your stream's rows + append ONE entry to **Session Log** (newest at bottom) + update **Gate status** if changed.
-> 3. Never delete another stream's notes. On merge conflict keep both sides.
-> 4. Status words: `NOT_STARTED · IN_PROGRESS · BLOCKED · DONE · VERIFIED`. `DONE` = Definition of Done met **including live-mode path**. `VERIFIED` = confirmed against real APIs on a human's machine.
-> 5. Label claims `VERIFIED / ASSUMPTION / UNKNOWN` (NN-14). Never paste secrets.
+**How to use:** every session reads this FIRST after AGENT.md/PLAN.md/BLUEPRINT.md, and updates it LAST.
+- Edit only **your stream's rows/sections** + append to the **Session Log**. On git conflict keep both sides.
+- Status values: `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `DONE` (code + required tests + live path works + contracts respected) · `VERIFIED` (integrated and exercised in an E2E case).
+- Never mark `DONE` on documentation alone. Never mark an API `PASS` unless tested from a real network.
+- Times in IST. Update `Last updated` whenever you change a row.
 
-_Last updated: 2026-10-31 · by Stream A session #1_
+**Project clock:** Hackathon start: `__:__ IST (fill)` · Freeze (G4): `+32 h` · End: `+36 h`
+**Teams:** Stream A = `<name>` · Stream B = `<name>` · Stream C = `<name>` (fill)
+**Current MG_MODE for demo:** `live`
 
 ---
 
-## 1. Gate status
-| Gate | Target | Status | Notes |
-|---|---|---|---|
-| G0 contracts merged (M0) | H2 | **NOT DONE by Stream C** | Stream A made *temporary copies* of contracts/config/guards so it could build. Stream C's M0 must replace/reconcile them (see §6 CR-1, CR-2). |
-| G1 API verification decision | H3 | **NOT DONE** | A1 never run: Stream A's sandbox has no access to data.gov.in / OSRM / Open-Meteo. A human must run it (see §4). |
-| G2 vertical slice (`POST /plan` live) | H12 | not started | Needs B5 + C1 + live-verified A7. |
-| G3 dispatch loop | H24 | not started | |
-| G4 freeze / G5 rehearsal | H32 / H36 | not started | |
+## 1. Gates
+
+| Gate | Condition | Target | Status | Date/time | Notes |
+|---|---|---|---|---|---|
+| G0 | Contracts + scaffold merged to `main`; all three streams pulled | H2 | NOT_STARTED | | |
+| G1 | API verification complete; decision D-A1 written (mandi source) | H3 | NOT_STARTED | | |
+| G2 | **Vertical slice:** `POST /plan` with live data returns A/B/C + coverage grade | H12 | NOT_STARTED | | |
+| G3 | **Dispatch loop:** approve → Telegram → check-in → tick → recompute → diff → approval | H24 | NOT_STARTED | | |
+| G4 | **FREEZE:** no new features; bug-fix only | H32 | NOT_STARTED | | |
+| G5 | 3 full rehearsals + failure drills passed | H36 | NOT_STARTED | | |
+
+---
 
 ## 2. Module tracker
-| ID | Module | Stream | Status | Notes |
+
+### Shared
+| ID | Module | Owner | Status | Branch/commit | Tests | Last updated | Notes |
+|---|---|---|---|---|---|---|---|
+| M0 | Scaffold + contracts v1.0 + config + guards | P1 | DONE (awaiting P1 line-by-line review + push to main) | batch-1 zip | 24 tests (11 contracts + 13 config/guards) | session-1 | Contracts split into evidence/inputs/plans/events files; fields identical to BLUEPRINT §1. **G0 is ticked only after push + P2 pulls.** |
+
+### Stream A — Data & Integrations
+| ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
+|---|---|---|---|---|---|---|
+| A1 | API verification gate | NOT_STARTED | | | | Run `scripts/check_apis.py`; fill §3 |
+| A2 | HTTP core / cache / ledger | NOT_STARTED | | | | deps M0 |
+| A3 | Mandi ingestion & shortlist | NOT_STARTED | | | | deps A2 |
+| A4 | Geocoding & coords table | NOT_STARTED | | | | deps A2 |
+| A5 | Routing + waypoint table | NOT_STARTED | | | | deps A2 |
+| A6 | Weather along route | NOT_STARTED | | | | deps A2, A5 |
+| A7 | Candidate assembler + source health | NOT_STARTED | | | | deps A3–A6; completes A-side of G2 |
+| A8 | Historical loader / replay (P1) | NOT_STARTED | | | | deps A2 |
+| A9 | Deployment & hardening | NOT_STARTED | | | | |
+
+### Stream B — Decision Engine
+| ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
+|---|---|---|---|---|---|---|
+| B1 | Units / time / helpers | DONE (awaiting review) | batch-1 zip | 28 tests | session-1 | `app/engine/units.py` |
+| B2 | Ripening exposure | DONE (awaiting review) | batch-1 zip | 23 tests | session-1 | Golden values pass (10.4/13.2/20.8 %, None at 26 °C, chilling_risk). Table transcribed from a search excerpt: **re-check against the original UC Davis page** |
+| B3 | Net value | DONE (awaiting review) | batch-1 zip | 16 tests | session-1 | Golden 51 200 passes; unknown costs reported in `unknown_fields`, never hidden |
+| B4 | Option evaluator + 9-scenario grid | NOT_STARTED | | | | deps B2, B3, M0 |
+| B5 | Plan builder A/B/C | NOT_STARTED | | | | deps B4 |
+| B6 | Commitment points | NOT_STARTED | | | | deps B4 |
+| B7 | Flip boundaries | NOT_STARTED | | | | deps B4, B6 |
+| B8 | Coverage grader | NOT_STARTED | | | | deps M0 |
+| B9 | Triggers / hysteresis / recompute / diff | NOT_STARTED | | | | deps B5–B8 |
+| B9b | Template explainer + number check | NOT_STARTED | | | | deps B5, B9 |
+| B10 | Backtest harness (P1) | NOT_STARTED | | | | deps A8, B5 |
+
+### Stream C — Agent, API, Telegram, UI
+| ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
+|---|---|---|---|---|---|---|
+| C1 | FastAPI + DB wiring + dev stubs | NOT_STARTED | | | | deps M0 |
+| C2 | Telegram integration | NOT_STARTED | | | | deps M0; live-location only if A1 verifies |
+| C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
+| C4 | Watchdog | NOT_STARTED | | | | deps C1, C3, B9 |
+| C5 | Streamlit UI (4 screens) | NOT_STARTED | | | | deps C1 |
+| C6 | What-if + Flip Finder (P1) | NOT_STARTED | | | | |
+| C7 | E2E tests + rehearsal | NOT_STARTED | | | | |
+
+### Next up per stream (update at every session end)
+- **A:** A1 (run the checker, interpret results). Then A2 after M0.
+- **B (Person 1):** next = **B4** (option evaluator + 9-scenario grid), then B5, B8, B6, B7, C1.
+- **C:** M0 done — Person 1 must push to `main` so Person 2 can pull (G0).
+
+---
+
+## 3. API verification (Stream A fills from real runs — no PASS without a real test)
+
+Levels: **doc** (documentation read) · **reach** (endpoint reachable) · **resp** (real response seen) · **fields** (required fields present) · **e2e** (used inside the app).
+
+| # | Service | doc | reach | resp | fields | e2e | Verdict | Newest data date / latency / notes |
+|---|---|---|---|---|---|---|---|---|
+| 1 | data.gov.in mandi prices | ✔ (fields) | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | one external project reported it down during a hackathon; unit (₹/qtl?) unverified |
+| 2 | Open-Meteo forecast | ✔ | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | free non-commercial, <10k/day |
+| 3 | Open-Meteo archive | ✔ | NOT TESTED | NOT TESTED | NOT TESTED | — | NOT TESTED | |
+| 4 | Open-Meteo historical-forecast | partial | NOT TESTED | NOT TESTED | NOT TESTED | — | NOT TESTED | host from memory |
+| 5 | Open-Meteo Flood (proxy) | ✔ | NOT TESTED | NOT TESTED | NOT TESTED | — | NOT TESTED | river-flow proxy only |
+| 6 | OSRM demo (route, alternatives) | ✔ | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | ≤1 req/s |
+| 6b | OSRM `table` | ✔ | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | needed for commit points |
+| 6c | OSM-DE OSRM (fallback) | partial | NOT TESTED | NOT TESTED | NOT TESTED | — | NOT TESTED | path from memory |
+| 7 | Nominatim | ✔ | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | UA required, ≤1 req/s |
+| 7b | Geocoding fallbacks (Open-Meteo, Photon) | partial | NOT TESTED | NOT TESTED | NOT TESTED | — | NOT TESTED | |
+| 8 | Telegram send + inline buttons | partial | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | |
+| 8b | Telegram callback_query | partial | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | |
+| 8c | Telegram LIVE location edits | UNKNOWN | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | **P1 unless it passes** |
+| 9 | Groq LLM (optional) | partial | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | endpoint from memory |
+| 9b | Anthropic LLM (fallback) | partial | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | |
+
+**Decision D-A1 (fill after running the checker):** `<mandi source verdict + chosen scope: live | replay-led | pivot> — decided by <name> at <time>`
+
+**Facts to record from real responses (A1/A3):** newest `arrival_date`: `__` · number of markets for tomato in origin state: `__` · price unit verified: `yes/no` · record keys: `__` · data.gov.in rate/HTTP behaviour: `__` · Telegram live-location updates received: `yes/no`.
+
+---
+
+## 4. Decisions log (append-only; D-01…D-14 are pre-agreed in PLAN.md §2)
+
+| ID | Date | Decision | By | Reason |
 |---|---|---|---|---|
-| M0 | Scaffold + contracts | C | NOT_STARTED (A has temp copies) | contracts copied exactly from BLUEPRINT §1 |
-| A1 | API verification gate | A | **NOT_STARTED — needs human + keys** | `scripts/check_apis.py` was NOT in the uploads; not seen by Stream A |
-| A2 | HTTP core, cache, ledger | A | IN_PROGRESS (code+mocked tests done; live DoD pending) | `app/data/http.py`, `app/db/*` |
-| A3 | Mandi ingestion & shortlist | A | IN_PROGRESS (same) | `app/data/mandi.py` |
-| A4 | Geocoding & coords table | A | IN_PROGRESS (same) | `app/data/geocode.py`, `scripts/build_coords.py`; **needs ≥10 human-verified rows in mandi_coords.csv** |
-| A5 | Routing | A | IN_PROGRESS (same) | `app/data/routing.py` |
-| A6 | Weather along route | A | IN_PROGRESS (same) | `app/data/weather.py` |
-| A7 | Assembler & source health | A | IN_PROGRESS (same) | `app/data/assemble.py`, `health.py` |
-| A8 | Historical loader (P1) | A | NOT_STARTED | only after all P0 DONE |
-| A9 | Deployment & hardening | A | NOT_STARTED | |
-| B1–B10 | Decision engine | B | NOT_STARTED (as far as this file knows) | Stream B: update your rows |
-| C1–C7 | API, agent, Telegram, UI | C | NOT_STARTED (as far as this file knows) | Stream C: update your rows |
+| D-01…D-14 | pre-hackathon | See PLAN.md §2 | team | |
+| D-A1 | | (mandi source verdict) | | |
 
-## 3. Stream A — what exists (file inventory, all in repo root)
-| Path | What it is |
-|---|---|
-| `app/data/http.py` | `request_json(...)` single entry for every external call: SQLite TTL cache, per-host `RateLimiter`, 1 retry+backoff, timeout ≤20 s, **never raises on HTTP errors** (returns `HttpResult`, iterable as `(data, meta, error)`), stale-cache fallback (`max_stale_s`), secret redaction, `make_evidence()`, `new_evidence_id()`, `collect()` context (gathers evidence/calls/warnings), `add_warning()`, test time hooks. |
-| `app/data/geo.py` | haversine, India bbox, `mandi_id()` slug, state-name aliases, `states_for()` (neighbours), `IST` fixed +05:30 (no tzdata dep). |
-| `app/data/mandi.py` | data.gov.in fetch (pagination, filter-style fallback, client-side re-check), `normalize_record`, suspect rules, `select_variety_grade`, `build_price_band` (3 observed evidence rows), `shortlist`. |
-| `app/data/geocode.py` | chain: manual verified CSV / `mandi_settings` → cache → Nominatim → Open-Meteo geocoding → district centroid → unknown. Precision tags; never invents coords; outages not cached as "not found". |
-| `app/data/routing.py` | OSRM route (+alternatives, steps) → waypoints with step-based `elapsed_nominal_s`; ONE table call per route → `Waypoint.to_dest_s`; fallback server + 60 s circuit-breaker; no straight-line fakes. |
-| `app/data/weather.py` | one multi-location Open-Meteo call per route; local-hour alignment using `utc_offset_seconds` (+05:30 trap handled); None never 0; destination weather; river-flow **proxy** evidence. |
-| `app/data/assemble.py` | **`assemble_candidates(req, now)`**, **`refresh_for_monitoring(req, option_ids, now, *, variety, grade, force)`**, `CandidateAssembly`. Re-exports `source_health`. |
-| `app/data/health.py` | **`source_health(probe=True)`** (cached 5-min probes; `probe=False` = passive from `source_calls`). |
-| `app/db/schema.sql`, `db.py` | PLAN §8 schema + `http_cache` + indexes. Helpers: `get_conn`, `init_db`, `get_evidence(id)`, `get/upsert_mandi_setting`. |
-| `app/contracts/`, `app/config.py`, `app/guards.py` | **TEMP COPIES** (exact per BLUEPRINT). config also has `.env` auto-loader + `env()`, `datagov_key()`, `price_unit_verified()`. |
-| `data/reference/neighbour_states.json` | **DRAFT, needs human review.** |
-| `data/reference/mandi_coords.csv` | header only (no unverified/invented rows). |
-| `scripts/build_coords.py` | geocodes demo mandis → `mandi_coords_candidates.csv` (git-ignored) for HUMAN map verification. |
-| `tests/data/*` | 108 tests, all HTTP mocked (`FIXTURE_*` in `tests/data/fixtures.py`). |
+---
 
-### Public API for other streams
-```python
-from app.data.assemble import assemble_candidates, refresh_for_monitoring, CandidateAssembly
-from app.data.health import source_health
-from app.db.db import init_db, get_evidence, upsert_mandi_setting   # C: /evidence/{id}, UI closing-time inputs
-from app.data.http import collect, make_evidence                      # optional
-```
-- `assemble_candidates` can take ~30–70 s **cold** (1 req/s OSRM/Nominatim); warm cache ≈ <40 s. Accepts `progress=callable(str)`.
-- Mandi ids = `app.data.geo.mandi_id(state, district, market)` → keys of `DispatchRequest.mandi_latest_arrival`. UI must list ids from `CandidateAssembly.candidates`.
-- Every number in candidates has an evidence id; `CandidateAssembly.evidence` is the ledger subset; full rows in DB table `evidence`.
-- Degradation: failed price → candidate dropped; failed weather → `route.weather=[]` + warning; failed route → candidate kept with `routes=[]` + warning; unknown location → dropped. Check `warnings` and `source_status`.
+## 5. Contract changes (CR log)
 
-## 4. API Verification (gate A1) — partial, human run 2026-10-31 (PowerShell Invoke-RestMethod)
-| Source | Result | Newest record date | Latency | Notes |
+| CR | Date | Stream | Change (additive? y/n) | Why | Approved by | Commit |
+|---|---|---|---|---|---|---|
+| CR-1 (PROPOSED, not applied) | session-1 | P1 | additive: add `"missing_weather"` to `RipeningResult.flag` (or give B4 another way to say 'temperature missing') | B2 refuses missing temperatures (`MissingTemperatureError`) and B4 must still return a `PlanOption`. Decide when starting B4. | pending | |
+
+Contracts version: **v1.0** (text in BLUEPRINT §1).
+
+---
+
+## 6. Scope requests (parked — do not build without "approve SR-n")
+
+| SR | Date | Requested by | Request | Cost / what it displaces | Decision |
+|---|---|---|---|---|---|
+| SR-0 | pre-hackathon | planning | Market-absorption / supply-pressure indicator | Data does not support it (arrivals ≠ traded ≠ unsold ≠ absorption); REMOVED | rejected |
+| SR-0b | pre-hackathon | planning | Feeder-region supply-shock predictor; price ML as headline | Unproven; P1 only if it beats persistence | parked |
+
+---
+
+## 7. Blockers & cross-stream requests
+
+| # | Date | Raised by | Addressed to | Issue | Status |
+|---|---|---|---|---|---|
+| — | | | | | |
+
+---
+
+## 8. Assumptions introduced during the build (add to `app/config.py` and PLAN §6)
+
+| Date | Stream | Assumption | Where shown in UI | Evidence status |
 |---|---|---|---|---|
-| data.gov.in Agmarknet (via PowerShell) | **PASS** (VERIFIED by human run) | 31/10/2026 (age 0 d) | 0.1–0.7 s | all 10 fields present, lowercase ids: state, district, market, commodity, variety, grade, arrival_date, min_price, max_price, modal_price. Date format **dd/mm/yyyy** confirmed. Both `filters[state.keyword]` and `filters[state]` work. `limit=500` accepted. Prices come as JSON numbers. **Tomato Maharashtra today: total=3 records only.** |
-| data.gov.in via **Python `requests`** | **ROOT CAUSE FOUND (VERIFIED by human test)** | – | – | default `python-requests` User-Agent -> ReadTimeout (32 s); custom UA `MandiGuard/0.1 (test)` -> 200 in 0.8 s; `curl/8.0` -> 200 in 0.9 s. **Fix applied in http.py (D-A11): every call sends `MandiGuard/0.1 (<MG_CONTACT_EMAIL>)`.** Needs a human re-run of build_coords.py to confirm. |
-| Price unit | **UNVERIFIED** | – | – | field metadata gives NO unit. Values (MH 500–1200, TN 3000–4000) are plausible as Rs/quintal, absurd as Rs/kg. Plausible ≠ verified: confirm from Agmarknet's own table header before setting `MG_PRICE_UNIT_VERIFIED=1`. |
-| Open-Meteo / OSRM / Nominatim / Telegram | UNKNOWN | – | – | not yet run |
-Decision D-A1: mandi API **PASS** by the G1 rule (fresh record <=3 d, 10 fields) via PowerShell; Python-client path must still be confirmed.
+| | | | | |
 
-## 5. Decisions
-| ID | Decision | By |
-|---|---|---|
-| D-A2 | Added generic `http_cache` table (mandi/misc); routes→`route_cache`, weather→`weather_cache`, geocodes→`geocode_cache`. | A |
-| D-A3 | One weather Evidence per sample (value = temp °C); precipitation is in the evidence **note** because `WeatherSample` has a single `evidence_id`. | A |
-| D-A4 | India time = fixed +05:30 (`geo.IST`), avoids `tzdata` dependency on Windows. | A |
-| D-A5 | Mandi shortlist uses straight-line prefilter on market coords, else **district centroid** (network, budget 40/call, cached forever). Run `build_coords.py` to pre-warm. | A |
-| D-A6 | Variety/grade chosen among **shortlisted** mandis; mandis lacking that pair are dropped with a named warning. | A |
-| D-A7 | Price evidence labels say "price reported (record date: …)" (not "today") because records can be days old. | A |
-| D-A8 | Nominatim is **skipped** (not called anonymously) if `MG_CONTACT_EMAIL` unset. | A |
-| D-A10 | Server-side state filter: keep default `state.keyword` (verified working; plain `state` also works). Page limit 500 stays. | A |
-| D-A11 | `request_json` always sends an identifying User-Agent (caller headers override). Fixes data.gov.in stalling the default python UA. | A |
-| D-A12 | Geocoding tries the BRACKET hint first (`Pune(Moshi)`->Moshi); a hit on the cleaned name that equals the district is downgraded to `district_centroid`; `refresh=True` bypasses cache (used by build_coords). Cause: live run geocoded Pune(Moshi) to Pune city centre labelled `market`. | A |
-| D-A9 | Prices carry `unit_verified=False` until human sets `MG_PRICE_UNIT_VERIFIED=1` after A1. | A |
+---
 
-## 6. Contract / shared-file changes (CR log)
-| CR | What | Why | Affects | Back-compat |
+## 9. E2E results (Stream C fills; see BLUEPRINT §4)
+
+| Case | Date/time | Mode (live/replay/dev_stub) | Result | Notes / defects |
 |---|---|---|---|---|
-| CR-1 (**needs approval**) | `app/config.py`: `.env` loader (autoload on import), `env()`, `datagov_key()`, `price_unit_verified()` | no python-dotenv allowed (PLAN §3); keys must load | C (M0 owner) | additive |
-| CR-2 (**needs approval**) | `app/db/schema.sql`: extra table `http_cache` + 3 indexes | generic TTL cache | all | additive |
-| CR-3 (**cross-stream convention**) | `option_id` and `route_id` MUST start with `mandi_id` followed by `::` or `~` | `refresh_for_monitoring` derives mandi ids from them (contract exposes none to A) | **B (option ids), C (watchdog)** | needs B+C agreement |
-| CR-4 (optional) | `WeatherSample` could carry `precip_evidence_id`; or `Evidence` gets structured extra values | precip currently only in note | A, B, C | additive |
+| E2E-1 Normal | | | | |
+| E2E-2 Plan reversal | | | | |
+| E2E-3 Commitment point | | | | |
+| E2E-4 Post-dispatch trigger | | | | |
+| E2E-5 Missing/stale evidence | | | | |
 
-## 7. Open issues / blockers (address to a stream)
-- **[Human]** A1 partly done (mandi API ok). Re-run `build_coords.py` after the User-Agent fix. Still: Open-Meteo, OSRM, Nominatim; confirm price unit; set `MG_CONTACT_EMAIL`.
-- **[Human]** Decide the variety/grade rule (see findings above).
-- **[Human]** Review `data/reference/neighbour_states.json` (DRAFT).
-- **[Human]** Run `scripts/build_coords.py`, verify on map, add ≥10 rows (verified=1) to `mandi_coords.csv`.
-- **[Human]** `scripts/check_apis.py` is referenced by PLAN/BLUEPRINT but was never provided to Stream A — supply it.
-- **[B]** Adopt CR-3 in `option_id`/`route_id`. `Waypoint.to_dest_s` is `None` when OSRM says unreachable or the table call failed (then `{}` empty) — treat as "commit points not computed".
-- **[C]** Call `init_db()` in lifespan; call `refresh_for_monitoring(..., variety=, grade=)` with values stored from the plan (pass both or neither); `force=True` for demo ticks (bypasses price+weather caches). Persist `CandidateAssembly.selected_variety/grade` with the plan.
-- **[C]** M0 must reconcile the temp copies of contracts/config/guards (do not fork them).
-- **[A]** A8 and A9 not started.
+---
 
-### Findings from the real data (2026-10-31) — need a human decision / follow-up
-- **Very thin data:** Maharashtra had only 3 tomato records today (neighbour states add more). Few candidates is normal.
-- **Variety rule drops mandis:** Pune(Moshi)=`Local/Local`, Rahata & Khed=`Other/Local`. Rule D-A6 keeps the most common pair (`Other/Local`) and DROPS Pune. Options: keep (strict comparability) or match on GRADE only / treat `Other`,`Local`,`Deshi` as one group. **Human decision pending; not changed.**
-- **Degenerate price bands:** some records have min=modal=max (e.g. 800/800/800) -> the 3 price scenarios collapse. Valid under our rules but weak; suggest B/coverage adds a caveat (Stream B request).
-- **Market names carry the real yard in brackets** (`Pune(Moshi)`, `Khed(Chakan)`): `clean_market_name` strips brackets, so Nominatim would geocode "Pune" city, not Moshi, yet may be labelled `market` precision. **Use verified manual coords for demo mandis.**
-- **District renames:** `Ahilyanagar` (formerly Ahmednagar) may not geocode by name -> falls to unknown; add manual coords.
-- Records have trailing spaces in market names (`"Pune(Moshi) "`); already stripped by `normalize_record`.
+## 10. Questions for organisers (record answers)
 
-## 8. Gotchas learned (save yourself time)
-- `urllib.parse.urlparse` splits `;…` off the path (breaks OSRM-style `/driving/a;b` parsing in test callbacks) → use `urlsplit`.
-- Open-Meteo times are **local** (UTC+05:30) → hour boundaries ≠ UTC hours; align with `utc_offset_seconds`.
-- Open-Meteo returns a **list** for ≥2 locations, a **dict** for 1.
-- Tests use `FakeClock` (conftest) — `sleep()` advances instantly; real waiting never happens. Limiter/backoff read time via `http._clock/_sleep` hooks.
-- Don't reuse loop variable names across record/route types (mypy caught this in `assemble.py`).
-- `DB_PATH=':memory:'` is rejected (one connection per call).
-- No fixtures in `app/` (a test enforces NN-1).
+| # | Question | Answer | Date |
+|---|---|---|---|
+| 1 | Are pre-collected historical datasets (CEDA / India Data Portal) and cached API responses allowed? | | |
+| 2 | Is a pre-verified `mandi_coords.csv` allowed? | | |
+| 3 | Are clearly labelled historical replays acceptable alongside the live demo? | | |
+| 4 | Is Telegram acceptable as the action channel? | | |
+| 5 | Any restrictions on free-tier APIs during judging? | | |
 
-## 9. Scope Requests (AGENT §3 protocol)
-_None yet._
+---
 
-## 10. E2E results (BLUEPRINT §4)
-_Not run._
+## 11. Known facts & lessons carried over from planning (read before coding)
 
-## 11. Session Log (append only, newest last)
+- **Competitors found (do not rebuild as the headline):** NetBhav (net-realization with deductions, multi-source freshness badges, FPO console — author reports data.gov.in was down for the whole hackathon), Kisan Sabha (nearby-mandi rate comparison, freight booking/calculator), Kisan Rath (truck matching), e-NAM (trading platform + arrivals/trade dashboard). Claim only: "we found no tool doing monitored contingency plans with commitment points in our searches."
+- **Mandi live record has no arrivals field**; arrivals exist only historically (CEDA / India Data Portal), lagged.
+- **Heat evidence:** UC Davis days-to-full-red table (stage × 12.5–25 °C) is the only quantitative basis; Ghana study (marketed within 2–4 days at 30 °C vs 8–12 at 20 °C) and a handbook guideline (≤ 12 h transport if tomato > 25 °C) are secondary anchors. Cargo-temperature offsets are assumptions.
+- **Logic-test lessons (first prototype):** (1) 27 raw scenarios collapse to 9 money scenarios — keep cargo offsets out of the money grid; (2) applying delay to *both* A and B produced a meaningless flip at δ=0 — delay applies to the monitored plan only; (3) variable-name collisions between plan labels produced wrong A/B — test with ≥ 3 candidates; (4) commit-point test returned `None` because the wrong mandi's closing time was used — pass B's own closing time; (5) point-of-no-return depends on the delay scenario — always label it.
+- **Sandbox limitation:** the planning session could not reach the APIs (DNS blocked). **No API has been tested.** `scripts/check_apis.py` exists (statuses PASS/PARTIAL/FAIL/NOT TESTED, writes `api_report.json`). Run it from your own network at A1.
 
-### 2026-10-31 · Stream A · session #1 · A2–A7 code complete (mocked) · status IN_PROGRESS
-**Steps taken, in order:**
-1. Read AGENT.md, PLAN.md, BLUEPRINT.md fully. Chose Stream A (data & integrations) because the request was "files for fetching data from the APIs".
-2. Copied shared files exactly: `app/contracts/__init__.py`, `app/guards.py`; wrote `app/config.py` (Assumptions Registry + env helpers) and `.env.example`, `.gitignore`.
-3. Wrote DB: `schema.sql` (PLAN §8 + `http_cache`), `db.py`.
-4. Wrote `http.py` (A2) → tests green (17).
-5. Wrote `geo.py`, `neighbour_states.json` (DRAFT), empty `mandi_coords.csv`.
-6. Wrote `geocode.py` (A4), `mandi.py` (A3), `routing.py` (A5), `weather.py` (A6), `health.py`, `assemble.py` (A7), each with tests.
-7. **Hunter pass** (static + review) found and fixed: Open-Meteo market match only checked district (accepted wrong-named places); loop-variable reuse in `assemble.py`; pagination truncation if API caps page size; slug ids in warnings instead of market names; stale-cache price evidence not flagged; `force` not reaching weather; flood label aligned to approved wording; `.env` never loaded (added autoload); vacuous `or True` assertion in a test; test-double and fixture bugs (`urlparse` `;`).
-8. Added `scripts/build_coords.py`, `requirements.txt`, `README.md`, handoff note, this file; packaged `mandiguard_stream_a.zip`.
-- Tests: **108 passed** (all mocked). mypy clean on `app/` + `scripts/`; ruff F/E9 clean.
-- **NOT done / NOT verified:** any live API call (sandbox has no access to those hosts); A1 gate; A8; A9; real coordinates.
-- New assumptions: D-A2…D-A9 above; filter-style/state-spelling guesses for data.gov.in (UNKNOWN until A1).
-- Next module for Stream A: **A1** (human run), then A9 hardening; A8 only after all P0 DONE.
+---
 
-### 2026-10-31 · Stream A · session #2 · A1 partial results recorded · status IN_PROGRESS
-- Human ran PowerShell checks against data.gov.in: HTTP 200, fast, fields/date format/filters confirmed (see §4).
-- Python `requests` ReadTimeout vs fast PowerShell is unexplained -> diagnostic sent to human (compare default User-Agent / bracket encoding).
-- No code changed this session. Findings and pending decisions added to §7.
-- Next: Python-side diagnostic result -> then Open-Meteo/OSRM checks; variety-rule decision.
+## 12. Session log (append-only; newest at the bottom)
 
-### 2026-10-31 · Stream A · session #3 · User-Agent fix · status IN_PROGRESS
-- Human test proved data.gov.in stalls the default python-requests UA. Added `default_user_agent()` in `app/data/http.py`, used by all calls (Nominatim still sets its own contact UA). New test added. Tests: 109 expected passing.
-- Next: human re-runs `scripts/build_coords.py`; then Open-Meteo/OSRM checks.
+### Planning session · pre-hackathon · Stream — · Module —
+- Delivered: AGENT.md, PLAN.md, BLUEPRINT.md (contracts v1.0 verified to import + validate), PROGRESS.md, `scripts/check_apis.py` (compiles; error handling smoke-tested offline).
+- Not done: any API test; any application code.
+- Next: all streams start per "Next up per stream" above.
 
-### 2026-10-31 · Stream A · session #4 · geocoding precision fix · status IN_PROGRESS
-- Human ran build_coords.py OK (UA fix works). Pune(Moshi) came back as Pune city centre (wrong yard, labelled market); Khed(Chakan) uncertain; Rahata plausible. NOTHING verified yet -> mandi_coords.csv still empty.
-- Fix D-A12 in geocode.py/geo.py/build_coords.py + 3 tests. Old results are cached permanently: human must re-run build_coords (now uses refresh=True).
-- Next: human verifies 3 rows on map by hand (type correct Moshi/Chakan coords if needed), then Open-Meteo/OSRM checks.
+### session-1 · Person 1 (Claude wrote, Person 1 reviews) · M0 + B1 + B2 + B3 · status DONE (pending human review)
+- Delivered: `app/contracts/{evidence,inputs,plans,events,__init__}.py`, `app/config.py` (assumptions registry + tiny `.env` loader), `app/guards.py`, `app/engine/{units,ripening,netvalue}.py`, `data/reference/ripening_ucdavis.json`, `pytest.ini`, `requirements.txt`, `.env.example`, tests (91 passing; 6 deliberate code breakages were each caught by the tests; see VERIFICATION_RECORD.md).
+- Decisions: flag priority for ripening is `chilling_risk > out_of_range > over_limit > ok` (PLAN §7.7 corrected: the old text contradicted the BLUEPRINT golden test). Net value treats unknown deductions as 0 but lists them in `unknown_fields`.
+- Placeholders waiting for Person 2's results (search the code for `TODO(PERSON-2-RESULT)`): `config.py → price_unit_verified` (set True after A3 confirms ₹/quintal from a real response), `config.py → telegram_live_location_verified` (set True only if A1's Telegram test received live-location updates).
+- Open: CR-1 above; ripening table must be re-checked against the original source.
+- Next module for this stream: B4.
+
+<!-- Append new entries below using the HANDOFF BLOCK format from AGENT.md §9.3 -->

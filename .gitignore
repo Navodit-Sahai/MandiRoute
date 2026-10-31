@@ -11,3 +11,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv
+madienv/
+__pycache__/
+
+

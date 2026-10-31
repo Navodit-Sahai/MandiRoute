@@ -1,0 +1,17 @@
+{
+  "source": "UC Davis Postharvest Technology Center - tomato ripening: days to full red colour by ripeness stage and storage temperature",
+  "verification_status": "TRANSCRIBED during planning from a search-result excerpt. TODO: re-check every number against the original UC Davis page before the demo.",
+  "what_this_measures": "How fast tomatoes ripen (days until full red colour). It does NOT measure spoilage, shelf life in days, grade loss or price loss.",
+  "limits": [
+    "Table covers only 12.5 to 25 degrees C. Outside this range we return 'outside evidence range' and never extrapolate.",
+    "Data is for conventional (mostly US) cultivars. Indian varieties may ripen differently.",
+    "The 'light red' stage is not in the table, so it is not supported."
+  ],
+  "temps_c": [12.5, 15.0, 17.5, 20.0, 22.5, 25.0],
+  "days_to_full_red": {
+    "MG":      [18, 15, 12, 10, 8, 7],
+    "BREAKER": [16, 13, 10,  8, 6, 5],
+    "TURNING": [13, 10,  8,  6, 4, 3],
+    "PINK":    [10,  8,  6,  4, 3, 2]
+  }
+}

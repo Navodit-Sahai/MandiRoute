@@ -199,7 +199,11 @@ Reference table (UC Davis, days to full red; **VERIFIED** table; conventional cu
 | TURNING | 13 | 10 | 8 | 6 | 4 | 3 |
 | PINK | 10 | 8 | 6 | 4 | 3 | 2 |
 
+<<<<<<< HEAD
 `consumed = Σ_segments (hours_i/24) / D(stage, T_ambient_i + offset)`, `D` by rate interpolation. Any segment outside [12.5, 25] ⇒ `consumed_pct=None`, `out_of_range=True` (no extrapolation). Flags: `out_of_range` > `chilling_risk` (refrigerated set-point < 12.5 °C with MG) > `over_limit` (worst consumed > user limit) > `ok`.
+=======
+`consumed = Σ_segments (hours_i/24) / D(stage, T_ambient_i + offset)`, `D` by rate interpolation. Any segment outside [12.5, 25] ⇒ `consumed_pct=None`, `out_of_range=True` (no extrapolation). Flags (strongest warning first): `chilling_risk` (refrigerated set-point < 12.5 °C with MG; also below the table, but the chilling hazard is the stronger statement) > `out_of_range` > `over_limit` (worst consumed > user limit) > `ok`.
+>>>>>>> origin/main
 Golden: PINK, 10 h at 20 °C ⇒ 10.4 %; at 22 °C ⇒ 13.2 %; at 25 °C ⇒ 20.8 %; at 26 °C ⇒ None/out_of_range.
 UI may claim: "share of the remaining ripening window consumed during transit (range across assumed cargo offsets)". UI may NOT claim spoilage, shelf-life days, grade loss or ₹ loss.
 

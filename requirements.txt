@@ -1,7 +1,13 @@
-# Stream A minimum (Stream C adds fastapi, uvicorn, langgraph, streamlit, pydeck per PLAN section 3).
-# Pin exact versions into requirements.lock after the first clean install (pip freeze > requirements.lock).
-pydantic>=2.5
-requests>=2.31
-# tests only
-pytest>=8.0
-responses>=0.25
+
+# After your first clean install run:  pip freeze > requirements.lock   (then pin versions)
+fastapi
+uvicorn[standard]
+pydantic>=2
+requests
+tzdata   # IANA timezone database; Python's zoneinfo needs it on Windows (from my knowledge - NOT tested on Windows)
+streamlit
+langgraph
+# langgraph SQLite checkpointer: check the exact package name at install time (do not guess)
+pytest
+responses
+# Packages from PLAN.md section 3. Do NOT add anything else without asking.
