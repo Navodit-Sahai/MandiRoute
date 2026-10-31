@@ -335,3 +335,12 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - 8 new tests in `tests/api/test_telegram.py` using `responses` covering unauthorized rejection, stale version, double tap idempotence, callback_data byte length <= 64, token redaction in logs/DB, failure resilience during approval, offset persistence, and thread exception resilience.
   - 46 tests passing across `tests/api`, `tests/agent`, and `tests/ui`.
   - Live verification with `MG_TELEGRAM=1`: Pune plan `23d2af56` created, proposal message sent (`message_id: 5`), dispatch approved, and check-in buttons message sent (`message_id: 6`).
+
+### 2026-11-01 · Stream C · session-compare-tags-fix · Compare page computed tags fix · status DONE (pending review)
+- Fix:
+  - Added `tag_for(value, evidence_id=None, source=None)` in `app/ui/format.py`: returns `[computed]` when `source="computed"` is explicitly passed for engine calculations (Flip Boundaries, Commitment Points, Reconsider conditions, Robustness, Window feasibility, and Net values). Returns `:red[[untagged]]` only when neither an evidence_id nor source is given. Preserves existing evidence-based tags (`[observed]`, `[forecast]`, `[proxy]`).
+  - Updated `app/ui/pages/2_Compare.py`: replaced `format_kind_tag(None)` with `tag_for(source='computed')` across all engine calculation lines.
+  - Added unit test in `tests/ui/test_format.py` verifying `tag_for` with engine calculations, unexplained values, and evidence lookups.
+- Verification:
+  - All 47 Stream C tests passed (`pytest tests/ui tests/api tests/agent`).
+  - Verified live on Pune plan `23d2af56`: zero `[untagged]` values remain anywhere on the Compare screen.

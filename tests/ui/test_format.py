@@ -113,3 +113,26 @@ def test_what_if_formatting_and_constants():
 
 
 
+def test_tag_for_engine_and_unexplained(monkeypatch):
+    from app.ui.format import tag_for
+
+    # Engine-sourced calculation with no evidence_id
+    assert tag_for(51200, source="computed") == "[computed]"
+    assert tag_for(51200, evidence_id=None, source="computed") == "[computed]"
+    assert tag_for("Never feasible", evidence_id=None, source="computed") == "[computed]"
+    assert tag_for(source="computed") == "[computed]"
+
+    # Untagged only when neither evidence_id nor source is given
+    assert tag_for(12345) == ":red[[untagged]]"
+    assert tag_for(12345, evidence_id=None) == ":red[[untagged]]"
+    assert tag_for(12345, evidence_id=None, source=None) == ":red[[untagged]]"
+    assert tag_for() == ":red[[untagged]]"
+
+    # Evidence ID lookup works as before
+    monkeypatch.setattr(
+        "app.ui.api_client.get_evidence_cached",
+        lambda eid: {"kind": "observed"} if eid == "ev_obs" else {"kind": "forecast"} if eid == "ev_fc" else None,
+    )
+    assert tag_for(2000.0, evidence_id="ev_obs") == "[observed]"
+    assert tag_for(5.0, evidence_id="ev_fc") == "[forecast]"
+    assert tag_for(999.0, evidence_id="ev_missing") == ":red[[untagged]]"

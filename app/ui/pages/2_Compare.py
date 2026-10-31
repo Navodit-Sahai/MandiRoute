@@ -29,6 +29,7 @@ from app.ui.format import (
     WINDOW_UNKNOWN_LABEL,
     format_inr,
     format_kind_tag,
+    tag_for,
     format_location_precision,
     unavailable_if_none,
 )
@@ -242,8 +243,8 @@ st.markdown("---")
 rob_a = planset.get("robustness_a_best_in", 0)
 rob_of = planset.get("robustness_of", 9)
 # Robustness has no individual evidence ledger row -> untagged
-st.markdown(f"**Robustness:** {ROBUSTNESS_TEMPLATE.format(k=rob_a)} *(tested across price × delay scenarios)* {format_kind_tag(None)}")
-st.markdown(f"**Coverage Grade:** `{grade}` {format_kind_tag(None)}")
+st.markdown(f"**Robustness:** {ROBUSTNESS_TEMPLATE.format(k=rob_a)} *(tested across price × delay scenarios)* {tag_for(source='computed')}")
+st.markdown(f"**Coverage Grade:** `{grade}` {tag_for(source='computed')}")
 if reasons:
     st.caption("Coverage reasons: " + "; ".join(reasons))
 
@@ -333,8 +334,8 @@ for idx, plan in enumerate(plans):
         # Expected Net Value
         st.markdown("#### Expected Net Value")
         # Net values have no evidence row -> untagged
-        st.markdown(f"**Typical Case:** {format_inr(typical_net)} {format_kind_tag(None)}")
-        st.markdown(f"**Scenario Range (9 tests):** {format_inr(min_net)} to {format_inr(max_net)} {format_kind_tag(None)}")
+        st.markdown(f"**Typical Case:** {format_inr(typical_net)} {tag_for(source='computed')}")
+        st.markdown(f"**Scenario Range (9 tests):** {format_inr(min_net)} to {format_inr(max_net)} {tag_for(source='computed')}")
 
         # Transit & Timing
         st.markdown("#### Transit & Timing")
@@ -343,11 +344,11 @@ for idx, plan in enumerate(plans):
         st.markdown(f"**{TRAVEL_TIME_LABEL}:** {dur_str} {time_tag} ({dist_str} {dist_tag})")
 
         if window_st == "unknown":
-            st.markdown(f"**Window Status:** {WINDOW_UNKNOWN_LABEL} {format_kind_tag(None)}")
+            st.markdown(f"**Window Status:** {WINDOW_UNKNOWN_LABEL} {tag_for(source='computed')}")
         elif window_st == "met":
-            st.markdown(f"**Window Status:** Met before closing time {format_kind_tag(None)}")
+            st.markdown(f"**Window Status:** Met before closing time {tag_for(source='computed')}")
         else:
-            st.markdown(f"**Window Status:** Missed (trading closed) {format_kind_tag(None)}")
+            st.markdown(f"**Window Status:** Missed (trading closed) {tag_for(source='computed')}")
 
         # Weather / Rain
         rain_str = f"{rain_mm:.1f} mm" if rain_mm is not None else "unavailable"
@@ -381,11 +382,11 @@ for idx, plan in enumerate(plans):
         p_flip = flips.get("price_flip_per_qtl")
         flip_note = flips.get("note")
         if d_flip is not None:
-            st.markdown(f"- Delay flip: **{d_flip:.1f}% delay** {format_kind_tag(None)}")
+            st.markdown(f"- Delay flip: **{d_flip:.1f}% delay** {tag_for(source='computed')}")
         elif p_flip is not None:
-            st.markdown(f"- Price flip: **₹{p_flip:.0f}/qtl** {format_kind_tag(None)}")
+            st.markdown(f"- Price flip: **₹{p_flip:.0f}/qtl** {tag_for(source='computed')}")
         else:
-            st.markdown(f"- {NO_FLIP_LABEL} {format_kind_tag(None)}")
+            st.markdown(f"- {NO_FLIP_LABEL} {tag_for(source='computed')}")
         if flip_note:
             st.caption(f"Note: {flip_note}")
 
@@ -399,15 +400,15 @@ for idx, plan in enumerate(plans):
             for sc_name, wp in waypoints.items():
                 lbl_text = COMMIT_APPROX_TEMPLATE.format(scenario=sc_name)
                 wp_text = f"Waypoint {wp}" if wp is not None else "Never feasible"
-                st.markdown(f"- {lbl_text}: **{wp_text}** {format_kind_tag(None)}")
+                st.markdown(f"- {lbl_text}: **{wp_text}** {tag_for(source='computed')}")
         else:
-            st.markdown(f"- Commitment points not computed (closing time unknown) {format_kind_tag(None)}")
+            st.markdown(f"- Commitment points not computed (closing time unknown) {tag_for(source='computed')}")
 
         # Reconsider if...
         if reconsider:
             st.markdown("#### Reconsider Plan If:")
             for c in reconsider:
-                st.markdown(f"- **{c.get('kind')}** {c.get('comparison')} {c.get('threshold')}: {c.get('rationale')} {format_kind_tag(None)}")
+                st.markdown(f"- **{c.get('kind')}** {c.get('comparison')} {c.get('threshold')}: {c.get('rationale')} {tag_for(source='computed')}")
 
         # Evidence Drawer
         if ev_ids:
