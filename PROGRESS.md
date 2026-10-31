@@ -51,8 +51,8 @@
 | B1 | Units / time / helpers | DONE (awaiting review) | batch-1 zip | 28 tests | session-1 | `app/engine/units.py` |
 | B2 | Ripening exposure | DONE (awaiting review) | batch-1 zip | 23 tests | session-1 | Golden values pass (10.4/13.2/20.8 %, None at 26 °C, chilling_risk). Table transcribed from a search excerpt: **re-check against the original UC Davis page** |
 | B3 | Net value | DONE (awaiting review) | batch-1 zip | 16 tests | session-1 | Golden 51 200 passes; unknown costs reported in `unknown_fields`, never hidden |
-| B4 | Option evaluator + 9-scenario grid | NOT_STARTED | | | | deps B2, B3, M0 |
-| B5 | Plan builder A/B/C | NOT_STARTED | | | | deps B4 |
+| B4 | Option evaluator + 9-scenario grid | DONE (awaiting review) | stream-b | 8 golden tests | 2026-10-31 | `app/engine/scenarios.py`; 9 scenarios, CVaR25/mean score, ripening=None |
+| B5 | Plan builder A/B/C | DONE (awaiting review) | stream-b | 6 golden tests | 2026-10-31 | `app/engine/plans.py`; A/B/C selection, Fail(A) hedge, robustness, C departure slots |
 | B6 | Commitment points | NOT_STARTED | | | | deps B4 |
 | B7 | Flip boundaries | NOT_STARTED | | | | deps B4, B6 |
 | B8 | Coverage grader | DONE (awaiting review) | stream-b | 8 tests | session-B8 | `app/engine/coverage.py`; ripening omitted unless `ripening_enabled` |
@@ -225,3 +225,19 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Assumptions: a dimension is a caveat if ANY priced+routable candidate is affected (detail names mandis); price age = calendar days `now.date() - record_date`; ABSTAIN returns `items=[]`, reasons filled. Kinds: price/unit=observed, weather=forecast, closing/deductions=user_input, location=computed. `evidence` arg accepted but unused.
 - Ripening (SR-1): item omitted when `settings.ripening_enabled` is False; when enabled it only checks the ripeness stage was given.
 - Blocker: `ruff` not installed in this env (not run). Next module: B4.
+
+### 2026-10-31 · Stream B · session-B4 · B4 option evaluator & scenario grid · status DONE (pending review)
+- Module: B4 (`evaluate_option`, `option_sort_key`, `sort_options`).
+- Files: `app/engine/scenarios.py`, `app/engine/__init__.py`, `tests/engine/test_scenarios.py`.
+- Tests run: 83 passed in `tests/engine/` (8 golden tests in `test_scenarios.py`); 224 passed full suite (`pytest -q --tb=short`).
+- Assumptions: 27 environmental combinations collapse to 9 money scenarios; missed window adds `NEXT_DAY_WAIT_H * hold_cost_per_hour` with constant price level; closing time falls back from `cand.latest_arrival_local` to `req.mandi_latest_arrival`; rain exposure sums valid precipitation samples along route; ripening sets `ripening=None` without calling ripening when `ripening_enabled` is False.
+- Blockers: None. Next module: B5 (Plan builder A/B/C).
+
+- [A1 human run 2026-10-31] Telegram bot @MandiSarthi_bot: sendMessage, inline buttons and callback_query (data a|test) VERIFIED, private chat only. Live-location edits: UNKNOWN (P1, not needed; check-in buttons used).
+
+### 2026-10-31 · Stream B · session-B5 · B5 plan builder A/B/C · status DONE (pending review)
+- Module: B5 (`build_plan_set`).
+- Files: `app/engine/plans.py`, `app/engine/__init__.py`, `tests/engine/test_plans.py`.
+- Tests run: 101 passed in `tests/engine/` (6 golden tests in `test_plans.py`); 242 passed full suite (`pytest -q --tb=short`).
+- Assumptions: Ripening OFF (no ripening eligibility filter, no staging-ripening, no ripening reconsider_if); option_id strictly formatted as `{mandi_id}::{route_id}::{depart_iso}`; Plan B chooses best mean Net over Fail(A) scenarios, or standby when Fail(A) is empty; Plan C evaluates departure slots from config with hold cost; ABSTAIN when no priced candidates or coverage grade is ABSTAIN.
+- Blockers: None. Next module: B6 / B7 / B9.
