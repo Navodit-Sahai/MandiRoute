@@ -40,6 +40,7 @@ _STATE_SPELLINGS = {
     "Delhi": ["NCT of Delhi", "Delhi"],
     "Uttarakhand": ["Uttarakhand", "Uttrakhand"],
     "Puducherry": ["Puducherry", "Pondicherry"],
+    "Kerala": ["Keralam", "Kerala"],          # API now says "Keralam" (seen live 2026-10-31)
 }
 _FIELD_ALIASES = {"min_x0020_price": "min_price", "max_x0020_price": "max_price",
                   "modal_x0020_price": "modal_price", "arrival_date_": "arrival_date"}

@@ -275,3 +275,15 @@ def test_shortlist_spends_geocoding_budget_on_origin_state_first():
     assert ids == [mandi_id("Uttar Pradesh", "DU", "Home")]
     ids2 = mandi.shortlist(recs, o, 500, 8, geo, net_budget=1)
     assert ids2 == [mandi_id("Bihar", "DB", "Early")]
+
+
+@responses.activate
+def test_keralam_spelling_is_tried_and_records_are_accepted():
+    def cb(request):
+        q = parse_qs(urlparse(request.url).query)
+        st = (q.get("filters[state.keyword]") or [""])[0]
+        rows = [FIXTURE_record(state="Keralam", district="Thrissur", market="Thrissur")] if st == "Keralam" else []
+        return 200, {}, json.dumps({"total": len(rows), "records": rows})
+    responses.add_callback(responses.GET, mandi.RESOURCE_URL, callback=cb)
+    mf = mandi.fetch_mandi_records("Tomato", ["Kerala"], "K", FIXTURE_NOW)
+    assert len(mf.records) == 1 and mf.records[0].state == "Keralam"
