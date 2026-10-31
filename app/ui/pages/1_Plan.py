@@ -229,3 +229,4 @@ if "plan_response" in st.session_state:
                         st.error(f"Re-plan failed: {e}")
 
     st.markdown("👉 **Go to page `2_Compare` in the sidebar to review the route map and option comparisons.**")
+

@@ -64,3 +64,4 @@ def test_scan_forbidden_words_detects_violations():
     assert "guaranteed" in matches
     assert "ai-optimised profit" in matches
     assert "spoilage" in matches
+

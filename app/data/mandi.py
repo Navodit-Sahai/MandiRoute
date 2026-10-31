@@ -389,11 +389,13 @@ def build_price_band(record_group: list[MandiRecord], now: datetime) -> PriceBan
 
 # ---------------- shortlist ----------------
 def shortlist(records: list[MandiRecord], origin: LatLon, max_km: float, k: int, geocoder: _GeocoderLike,
-              net_budget: int | None = None) -> list[str]:
+              net_budget: int | None = None, state_order: list[str] | None = None) -> list[str]:
     """Straight-line (haversine) prefilter -> top-K mandi_ids, nearest first (ties by id).
 
     Location source per mandi: market-level (manual CSV / cache), else DISTRICT centroid (network, budgeted
     to respect the 1 req/s Nominatim policy; results are cached forever so coverage grows run by run).
+    state_order: the origin state first, then its neighbours. The limited network-geocoding budget is spent in
+    that order, so the origin state is never starved by alphabetically earlier neighbours.
     Mandis whose location cannot be resolved are skipped with a warning (never guessed)."""
     from app.data.geocode import GEOCODE_NET_BUDGET
     budget = GEOCODE_NET_BUDGET if net_budget is None else net_budget
@@ -403,7 +405,8 @@ def shortlist(records: list[MandiRecord], origin: LatLon, max_km: float, k: int,
     located: list[tuple[float, str]] = []
     unresolved = 0
     dist_cache: dict[tuple[str, str], "GeoResult"] = {}
-    for mid, r in sorted(reps.items()):
+    rank = {norm(canonical_state(st)): i for i, st in enumerate(state_order or [])}
+    for mid, r in sorted(reps.items(), key=lambda kv: (rank.get(norm(canonical_state(kv[1].state)), len(rank)), kv[0])):
         g = geocoder.lookup_local(r.market, r.district, r.state)
         if g is None or not g.resolved:
             dk = (norm(r.district), norm(canonical_state(r.state)))

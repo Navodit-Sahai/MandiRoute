@@ -52,3 +52,4 @@ def test_ui_does_not_import_engine_or_data():
                     assert not node.module.startswith("app.engine"), f"{f} imports engine directly: {node.module}"
                     assert not node.module.startswith("app.data"), f"{f} imports data directly: {node.module}"
                     assert not node.module.startswith("app.db"), f"{f} imports db directly: {node.module}"
+

@@ -44,3 +44,4 @@ MandiGuard evaluates multiple mandi destinations across price scenarios, transit
 
 Select **1_Plan** from the sidebar to begin.
 """)
+

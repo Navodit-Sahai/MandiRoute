@@ -85,3 +85,4 @@ def scan_forbidden_words(text: str) -> list[str]:
         if phrase in lowered:
             found.append(phrase)
     return found
+
