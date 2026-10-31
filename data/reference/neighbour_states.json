@@ -1,0 +1,30 @@
+{
+  "_status": "DRAFT from general geography knowledge (land borders between states, UTs omitted). NOT yet human-reviewed -- BLUEPRINT A3 requires a human to review before the demo. North-east states beyond West Bengal/Assam are intentionally omitted (MVP).",
+  "_reviewed_by": null,
+  "neighbours": {
+    "Andhra Pradesh":   ["Telangana", "Karnataka", "Tamil Nadu", "Odisha", "Chhattisgarh"],
+    "Karnataka":        ["Maharashtra", "Goa", "Kerala", "Tamil Nadu", "Andhra Pradesh", "Telangana"],
+    "Maharashtra":      ["Gujarat", "Madhya Pradesh", "Chhattisgarh", "Telangana", "Karnataka", "Goa"],
+    "Gujarat":          ["Rajasthan", "Madhya Pradesh", "Maharashtra"],
+    "Madhya Pradesh":   ["Rajasthan", "Uttar Pradesh", "Chhattisgarh", "Maharashtra", "Gujarat"],
+    "Rajasthan":        ["Punjab", "Haryana", "Uttar Pradesh", "Madhya Pradesh", "Gujarat"],
+    "Uttar Pradesh":    ["Uttarakhand", "Haryana", "Delhi", "Rajasthan", "Madhya Pradesh", "Chhattisgarh", "Jharkhand", "Bihar", "Himachal Pradesh"],
+    "Bihar":            ["Uttar Pradesh", "Jharkhand", "West Bengal"],
+    "West Bengal":      ["Bihar", "Jharkhand", "Odisha", "Assam", "Sikkim"],
+    "Odisha":           ["West Bengal", "Jharkhand", "Chhattisgarh", "Andhra Pradesh"],
+    "Jharkhand":        ["Bihar", "Uttar Pradesh", "Chhattisgarh", "Odisha", "West Bengal"],
+    "Chhattisgarh":     ["Uttar Pradesh", "Madhya Pradesh", "Maharashtra", "Telangana", "Andhra Pradesh", "Odisha", "Jharkhand"],
+    "Telangana":        ["Maharashtra", "Karnataka", "Andhra Pradesh", "Chhattisgarh"],
+    "Tamil Nadu":       ["Kerala", "Karnataka", "Andhra Pradesh"],
+    "Kerala":           ["Karnataka", "Tamil Nadu"],
+    "Punjab":           ["Haryana", "Rajasthan", "Himachal Pradesh", "Jammu and Kashmir"],
+    "Haryana":          ["Punjab", "Himachal Pradesh", "Uttarakhand", "Uttar Pradesh", "Delhi", "Rajasthan"],
+    "Himachal Pradesh": ["Jammu and Kashmir", "Punjab", "Haryana", "Uttarakhand", "Uttar Pradesh"],
+    "Uttarakhand":      ["Himachal Pradesh", "Haryana", "Uttar Pradesh"],
+    "Delhi":            ["Haryana", "Uttar Pradesh"],
+    "Goa":              ["Maharashtra", "Karnataka"],
+    "Assam":            ["West Bengal"],
+    "Sikkim":           ["West Bengal"],
+    "Jammu and Kashmir": ["Punjab", "Himachal Pradesh"]
+  }
+}

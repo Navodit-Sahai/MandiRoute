@@ -1,0 +1,13 @@
+.env
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/historical/
+data/snapshots/
+data/reference/mandi_coords_candidates.csv
+logs/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv
