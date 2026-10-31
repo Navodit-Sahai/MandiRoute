@@ -199,3 +199,23 @@ Contracts version: **v1.0** (text in BLUEPRINT §1).
 - Next module for this stream: B4.
 
 <!-- Append new entries below using the HANDOFF BLOCK format from AGENT.md §9.3 -->
+
+
+### 2026-10-31 · Stream A · session #5 · D-A13 grade-only matching + tzdata · status IN_PROGRESS
+- Human decisions recorded: approve 24h cuts; grade-only matching (D-A13); tzdata dependency added; Telegram token: human creating.
+- D-A13: `app/data/mandi.py` adds `select_grade`, `grade_support`; `group_by_mandi` now treats None as wildcard; `assemble.py` selects by GRADE, shows variety per mandi, warns "varieties differ". `selected_variety` is now None by default; pin grade for monitoring (`refresh_for_monitoring(..., grade=...)`).
+- Tests: 114 passed in Stream A sandbox (mocked). NOT yet run against the merged repo (contracts/config there differ from the temp copies Stream A used).
+- Security: `t.py` (diagnostic with a real key) was committed -> human to remove + rotate key. `check_apis.py` is in repo (not seen by Stream A).
+- Add `tzdata>=2024.1` to requirements.txt (engine B1 uses zoneinfo("Asia/Kolkata"); fails on Windows without it).
+## Paste into PROGRESS.md
+
+### §9 Scope Requests
+| SR-1 | 2026-10-31 | Remove tomato ripening exposure from the MVP (24 h left) | Human: approved | Keeps code (flag-guarded), removes dependency |
+Effects: engine B4/B5/B8/B9/B9b skip ripening; UI hides it; contract fields become Optional; trigger T4 disabled. Remaining product value: A/B/C plans under delay + price scenarios, window feasibility, rain exposure, flip boundaries, commitment points, hysteresis replan with diff, evidence ledger.
+Honest note: ripening was the crop-specific part of the pitch. Do not describe the product as tomato-quality or spoilage aware.
+
+### §6 CR-5 (needs merge FIRST)  
+`PlanOption.ripening` -> Optional (default None); `DispatchRequest.ripeness` -> Optional (default None); `Settings.ripening_enabled=False`. Back-compat: additive for readers, B/C must handle None.
+
+### Session log (Stream A)
+- No Stream A change needed: assembler never used ripening. Destination weather (used only for ripening) is still fetched; C may ignore it.

@@ -96,7 +96,7 @@ def test_happy_path_live_shape(monkeypatch):
     _mock_all()
     a = _run()
     assert [c.mandi_name for c in a.candidates] == ["Near, D1", "Mid, D2", "Far, D3"]        # nearest first
-    assert a.selected_variety == "Hybrid" and a.selected_grade == "FAQ"
+    assert a.selected_variety is None and a.selected_grade == "FAQ"
     for c in a.candidates:
         assert c.price and c.price.record_date == "2026-10-29" and c.location_precision == "market"
         assert c.routes and all(len(r.waypoints) <= 8 and r.weather for r in c.routes)
@@ -111,7 +111,7 @@ def test_happy_path_live_shape(monkeypatch):
     names = {s.name for s in a.source_status}
     assert {"datagov_agmarknet", "osrm", "open_meteo_forecast", "open_meteo_flood"} <= names
     assert next(s for s in a.source_status if s.name == "datagov_agmarknet").as_of == "2026-10-29"
-    assert any("variety/grade chosen" in w for w in a.warnings)
+    assert any("grade chosen" in w for w in a.warnings)
 
 
 @responses.activate
@@ -193,14 +193,26 @@ def test_unlocatable_mandi_dropped_with_warning(monkeypatch):
 
 
 @responses.activate
-def test_other_variety_mandi_dropped_for_comparability(monkeypatch):
+def test_grade_only_matching_keeps_other_varieties_but_warns(monkeypatch):
     monkeypatch.setenv("DATAGOV_KEY", KEY)
     recs = {"Maharashtra": [FIXTURE_record(market="Near", district="D1"), FIXTURE_record(market="Mid", district="D2"),
                             FIXTURE_record(market="Far", district="D3", variety="Local")]}
     _mock_all(recs)
     a = _run()
+    assert {c.mandi_name for c in a.candidates} == {"Near, D1", "Mid, D2", "Far, D3"}
+    assert {c.price.variety for c in a.candidates} == {"Hybrid", "Local"}           # each mandi shows its own variety
+    assert any("varieties differ" in w for w in a.warnings)
+
+
+@responses.activate
+def test_other_grade_mandi_is_dropped_for_comparability(monkeypatch):
+    monkeypatch.setenv("DATAGOV_KEY", KEY)
+    recs = {"Maharashtra": [FIXTURE_record(market="Near", district="D1"), FIXTURE_record(market="Mid", district="D2"),
+                            FIXTURE_record(market="Far", district="D3", grade="Medium")]}
+    _mock_all(recs)
+    a = _run()
     assert {c.mandi_name for c in a.candidates} == {"Near, D1", "Mid, D2"}
-    assert any("Far, D3" in w and "selected variety/grade" in w for w in a.warnings)
+    assert any("Far, D3" in w and "selected grade" in w for w in a.warnings)
 
 
 @responses.activate

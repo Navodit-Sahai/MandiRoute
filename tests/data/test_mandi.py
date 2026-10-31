@@ -252,3 +252,14 @@ def test_stale_cache_after_failed_fetch_marks_price_evidence_stale():
     assert len(mf.records) == 1 and mf.records[0].served_stale and any("CACHED" in w for w in mf.warnings)
     pb = mandi.build_price_band(mf.records, FIXTURE_NOW)             # record is only 1 day old, yet flagged stale
     assert all(db.get_evidence(i)["stale"] for i in pb.evidence_ids)
+
+
+def test_select_grade_most_mandis_then_alphabetical_and_wildcard_grouping():
+    recs = [_norm(market="A", grade="Local", variety="Other"), _norm(market="B", grade="Local", variety="Local"),
+            _norm(market="C", grade="FAQ"), _norm(market="D", grade="Medium")]
+    assert mandi.select_grade(recs) == "Local"
+    tie = [_norm(market="A", grade="Medium"), _norm(market="B", grade="FAQ")]
+    assert mandi.select_grade(tie) == "FAQ" and mandi.select_grade([]) is None
+    g = mandi.group_by_mandi(recs, None, "Local")                      # variety wildcard
+    assert set(g) == {mandi_id("Maharashtra", "Nashik", "A"), mandi_id("Maharashtra", "Nashik", "B")}
+    assert len(mandi.group_by_mandi(recs, "Other", "Local")) == 1      # exact pin still works
