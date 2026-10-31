@@ -1,4 +1,4 @@
-# Packages from PLAN.md section 3. Do NOT add anything else without asking.
+
 # After your first clean install run:  pip freeze > requirements.lock   (then pin versions)
 fastapi
 uvicorn[standard]
@@ -10,3 +10,4 @@ langgraph
 # langgraph SQLite checkpointer: check the exact package name at install time (do not guess)
 pytest
 responses
+# Packages from PLAN.md section 3. Do NOT add anything else without asking.
