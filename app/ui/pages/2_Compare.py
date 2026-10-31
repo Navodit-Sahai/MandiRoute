@@ -304,14 +304,14 @@ for idx, plan in enumerate(plans):
         (ev for ev in ev_map.values() if ev.get("source") == "osrm" and ev.get("unit") in ("h", "s")),
         None,
     )
-    time_tag = format_kind_tag(ev_time.get("kind") if ev_time else None)
+    time_tag = tag_for(duration_h, ev_time.get("id") if ev_time else None, source="computed")
 
     # 2. Distance (OSRM)
     ev_dist = next(
         (ev for ev in ev_map.values() if ev.get("source") == "osrm" and ev.get("unit") == "km"),
         None,
     )
-    dist_tag = format_kind_tag(ev_dist.get("kind") if ev_dist else None)
+    dist_tag = tag_for(distance_km, ev_dist.get("id") if ev_dist else None, source="computed")
 
     # 3. Reported price (datagov_agmarknet modal/typical)
     ev_price = next(
@@ -321,12 +321,8 @@ for idx, plan in enumerate(plans):
     price_tag = format_kind_tag(ev_price.get("kind") if ev_price else None)
     price_date = ev_price.get("as_of") if ev_price else "unknown"
 
-    # 4. Rain exposure
-    ev_rain = next(
-        (ev for ev in ev_map.values() if "rain" in ev.get("label", "").lower() or "precipitation" in ev.get("label", "").lower()),
-        None,
-    )
-    rain_tag = format_kind_tag(ev_rain.get("kind") if ev_rain else None)
+    # 4. Rain exposure (engine calculation from weather forecast samples)
+    rain_tag = tag_for(rain_mm, source="computed")
 
     # Location precision
     prec_label = mandi_precision_map.get(m_id, "unknown")
