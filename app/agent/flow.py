@@ -40,6 +40,7 @@ class FlowResult:
     summary: str | None = None
     map_points: list[dict[str, Any]] = field(default_factory=list)
     route_paths: dict[str, list[list[float]]] = field(default_factory=dict)
+    why_not_text: str | None = None
 
 
 def _record_trace(
@@ -229,11 +230,13 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
 
     # 6. Explain: Render summary and check numbers
     summary: str | None = None
+    why_not_text: str | None = None
     explain_summary = "Explainer not installed, summary=None"
     try:
         from app.contracts.evidence import Evidence
         from app.db.db import get_evidence
-        from app.explain import allowed_values, check_numbers, render_plan_summary
+        from app.engine import why_not_highest
+        from app.explain import allowed_values, check_numbers, render_plan_summary, render_why_not
 
         all_ev_ids = set(planset.evidence_ids)
         for p in planset.plans:
@@ -261,8 +264,24 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
         else:
             summary = text
             explain_summary = "Plan summary rendered and verified"
+
+        # Wire why-not
+        try:
+            w = why_not_highest(req, assembly.candidates, planset, cfg)
+            wn_raw = render_why_not(w)
+            wn_allowed = allowed_values(w, {})
+            wn_bad = check_numbers(wn_raw, wn_allowed)
+            if wn_bad:
+                why_not_text = None
+                assembly.warnings.append("why_not withheld: number check failed")
+            else:
+                why_not_text = wn_raw
+        except Exception as exc:
+            why_not_text = None
+            logger.warning("why_not calculation failed: %s", exc)
     except Exception as exc:
         summary = None
+        why_not_text = None
         explain_summary = f"Explainer error: {exc}"
 
     _record_trace(
@@ -270,7 +289,7 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
         step=step_num,
         node="explain",
         tool="app.explain.render_plan_summary" if summary else None,
-        args_json=json.dumps({"summary": summary}),
+        args_json=json.dumps({"summary": summary, "why_not_text": why_not_text}),
         result_summary=explain_summary,
         ok=True,
         ts=ts_now,
@@ -301,4 +320,5 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
         summary=summary,
         map_points=map_points,
         route_paths=route_paths,
+        why_not_text=why_not_text,
     )

@@ -262,14 +262,18 @@ def _tick_plan_unlocked(
             diff_text = f"Plan diff updated: {decision.reason}"
 
     if decision.propose_replan:
+        from app.integrations.telegram import build_callback_data
+
+        replan_text = f"Re-plan proposed for plan {plan_id}:\n{diff_text or decision.reason}"
+        replan_buttons = [
+            {"text": "Approve replan", "callback_data": build_callback_data("replan_ok", plan_id, new_version_num or 2)},
+            {"text": "Keep current plan", "callback_data": build_callback_data("replan_no", plan_id, planset.version)},
+        ]
         notify(
             plan_id=plan_id,
-            kind="replan_proposal",
-            text=diff_text or decision.reason,
-            buttons=[
-                {"text": "Accept Re-plan", "callback_data": f"a|replan|{new_version_num}"},
-                {"text": "Keep Current", "callback_data": f"r|replan|{planset.version}"},
-            ],
+            kind="replan_proposed",
+            text=replan_text,
+            buttons=replan_buttons,
         )
 
     return {

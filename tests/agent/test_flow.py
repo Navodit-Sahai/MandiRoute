@@ -100,6 +100,7 @@ def test_flow_execution_and_trace(monkeypatch):
     assert len(res.planset.plans) >= 1
     assert res.summary is not None
     assert isinstance(res.summary, str) and len(res.summary) > 0
+    assert res.why_not_text is not None and len(res.why_not_text) > 0
 
     # Verify agent_trace rows
     with get_conn() as conn:
@@ -113,3 +114,15 @@ def test_flow_execution_and_trace(monkeypatch):
         assert len(res.map_points) == 1
         assert "FIXTURE_m1~r0" in res.route_paths
 
+
+
+def test_why_not_withheld_when_number_check_fails(monkeypatch):
+    monkeypatch.setattr("app.agent.flow.assemble_candidates", lambda req, now: FIXTURE_assembly())
+    monkeypatch.setattr("app.explain.render_why_not", lambda w: "Why not Nashik? Rate of 999999.0 per quintal.")
+
+    req = FIXTURE_request()
+    now = datetime(2026, 10, 31, 5, 0, tzinfo=UTC)
+    res = run_plan_flow(req, plan_id="test_why_not_fail", now=now)
+
+    assert res.why_not_text is None
+    assert "why_not withheld: number check failed" in res.assembly_warnings

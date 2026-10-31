@@ -64,7 +64,7 @@
 | ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
 |---|---|---|---|---|---|---|
 | C1 | FastAPI + DB wiring + dev stubs | DONE (awaiting review) | stream-b | 11 tests | 2026-10-31 | `app/api/main.py`, `app/agent/flow.py`; live POST /plan returns A/B/C in 39.7s |
-| C2 | Telegram integration | NOT_STARTED | | | | deps M0; live-location only if A1 verifies |
+| C2 | Telegram integration | DONE (awaiting review) | stream-c | 46 tests | 2026-10-31 | `app/integrations/telegram.py`, inline keyboard, security/version/idempotency checks, polling daemon, actions logging |
 | C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
 | C4 | Watchdog + monitoring endpoints | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | `app/agent/watchdog.py`, `app/api/main.py`; tick, progress, approve, notify, diff endpoints |
 | C5 (Part 1) | Streamlit UI (Plan & Compare screens) | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | Screens 1 & 2 done; PyDeck map, A/B/C cards, format_inr, no forbidden words |
@@ -313,3 +313,25 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - Watchdog events timeline in reverse chronological order.
 - Compliance: AGENT §7 wording rules respected (no forbidden words), Ripening remains OFF (SR-1), no direct engine/data imports from UI.
 - Tests: 37 passed in `tests/ui`, `tests/api`, `tests/agent` (added `tests/api/test_whatif.py` and tests in `tests/ui/test_format.py`, `tests/ui/test_screens.py`).
+
+### 2026-10-31 ? Stream C ? session-C2-telegram ? Telegram integration + Why-Not wiring ? status DONE (pending review)
+- Part 0 (Why-Not wiring):
+  - Wired `why_not_highest` and `render_why_not` in `app/agent/flow.py`; verified via `check_numbers(text, allowed_values(w, {}))`; withheld with warning if check fails.
+  - Returned `why_not_text` in `POST /plan` and `GET /plans/{id}`; rendered in `app/ui/pages/2_Compare.py` inside "Why not the highest-price mandi?".
+  - Unit test in `tests/agent/test_flow.py` verifies why_not text and withholding behavior on check failure.
+- Part 1 (Telegram integration):
+  - Created `app/integrations/telegram.py`:
+    - `send()` with 20s timeout, retry, never raises, token redaction across URLs, errors, and actions logs.
+    - `build_callback_data()` with action|plan_id|version|arg (strictly <= 64 bytes) and `parse_callback_data()`.
+    - Polling thread `_telegram_polling_loop()` reading/persisting `tg_offset` to actions table.
+    - Security validation: `from.id == TG_CHAT_ID` and `chat.id == TG_CHAT_ID`; silent rejection of unauthorized attempts.
+    - Stale version rejection ("this button is out of date"), idempotency ("already done"), and button removal after use.
+    - Internal execution calling `apply_plan_approval` and `apply_plan_progress` (no HTTP self-calls).
+    - Wired `notify()` in `app/integrations/notify.py`: sends Telegram message when enabled, logs `message_id` receipt or error (ok=0/1) to actions table.
+    - Wired message templates: (a) plan proposal with Approve/Reject; (b) dispatch approved with check-in buttons (Passed waypoint, Delayed +30m, Delayed +60m, Arrived); (c) replan proposed with Approve replan / Keep current.
+- Part 2 (Demo script):
+  - Created `scripts/run_demo.ps1`: removes stale `DATAGOV_KEY`, sets `PYTHONPATH=.`, `MG_WATCHDOG=1`, `MG_DEMO=1`, `MG_TELEGRAM=1`, `MG_MODE=live`, launches FastAPI on port 8000 and Streamlit on port 8501 in separate PowerShell windows. Contains no secrets.
+- Tests & Verification:
+  - 8 new tests in `tests/api/test_telegram.py` using `responses` covering unauthorized rejection, stale version, double tap idempotence, callback_data byte length <= 64, token redaction in logs/DB, failure resilience during approval, offset persistence, and thread exception resilience.
+  - 46 tests passing across `tests/api`, `tests/agent`, and `tests/ui`.
+  - Live verification with `MG_TELEGRAM=1`: Pune plan `23d2af56` created, proposal message sent (`message_id: 5`), dispatch approved, and check-in buttons message sent (`message_id: 6`).

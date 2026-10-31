@@ -57,8 +57,12 @@ async def lifespan(app: FastAPI):
     init_db()
     # Start watchdog thread if MG_WATCHDOG=1
     start_watchdog_thread()
+    # Start Telegram polling thread if MG_TELEGRAM=1
+    from app.integrations.telegram import start_telegram_polling, stop_telegram_polling
+    start_telegram_polling()
     yield
-    # Cleanup background watchdog
+    # Cleanup background threads
+    stop_telegram_polling()
     stop_watchdog_thread()
 
 
@@ -93,6 +97,7 @@ class PlanResponse(BaseModel):
     source_status: list[SourceStatus] = []
     trace_id: str
     summary: str | None = None
+    why_not_text: str | None = None
     map_points: list[dict[str, Any]] = []
     route_paths: dict[str, list[list[float]]] = {}
 
@@ -172,6 +177,38 @@ def create_plan(req: DispatchRequest) -> PlanResponse:
             (plan_id, 1, flow_result.planset.model_dump_json(), None, now_iso),
         )
 
+    if flow_result.status == "awaiting_approval":
+        try:
+            from app.integrations.telegram import build_callback_data
+            opt_a = flow_result.planset.plans[0].option if flow_result.planset.plans else None
+            plan_names = ", ".join(f"Plan {p.label} ({p.option.mandi_name})" for p in flow_result.planset.plans)
+            if opt_a:
+                scens = [s.net_value for s in opt_a.scenario_results]
+                low_s = int(min(scens)) if scens else 0
+                high_s = int(max(scens)) if scens else 0
+                typ_s = next(
+                    (int(s.net_value) for s in opt_a.scenario_results if s.price_level == "typical" and s.delay_level == "none"),
+                    int(opt_a.score),
+                )
+                proposal_text = (
+                    f"Plan proposal for {plan_id}:\n"
+                    f"{plan_names}\n"
+                    f"Plan A typical net ₹{typ_s:,} (range ₹{low_s:,} - ₹{high_s:,})\n"
+                    f"Coverage: {flow_result.planset.coverage.grade}"
+                )
+                proposal_buttons = [
+                    {"text": "Approve", "callback_data": build_callback_data("approve", plan_id, 1)},
+                    {"text": "Reject", "callback_data": build_callback_data("reject", plan_id, 1)},
+                ]
+                notify(
+                    plan_id=plan_id,
+                    kind="plan_proposal",
+                    text=proposal_text,
+                    buttons=proposal_buttons,
+                )
+        except Exception as exc:
+            logger.warning("Failed to send plan proposal notification: %s", exc)
+
     return PlanResponse(
         plan_id=plan_id,
         status=flow_result.status,
@@ -181,6 +218,7 @@ def create_plan(req: DispatchRequest) -> PlanResponse:
         source_status=flow_result.source_status,
         trace_id=flow_result.trace_id,
         summary=flow_result.summary,
+        why_not_text=flow_result.why_not_text,
         map_points=flow_result.map_points,
         route_paths=flow_result.route_paths,
     )
@@ -227,10 +265,12 @@ def get_plan(id: str) -> dict[str, Any]:
         warnings.append(assemble_row["result_summary"])
 
     summary: str | None = None
+    why_not_text: str | None = None
     if explain_row and explain_row["args_json"]:
         try:
             ex_data = json.loads(explain_row["args_json"])
             summary = ex_data.get("summary")
+            why_not_text = ex_data.get("why_not_text")
         except Exception:
             pass
 
@@ -248,6 +288,7 @@ def get_plan(id: str) -> dict[str, Any]:
         "planset": planset,
         "coverage": coverage,
         "summary": summary,
+        "why_not_text": why_not_text,
         "map_points": map_points,
         "route_paths": route_paths,
         "warnings": warnings,
@@ -290,12 +331,16 @@ def get_evidence_by_id(id: str) -> dict[str, Any]:
     return row
 
 
-@app.post("/plans/{id}/approve")
-def approve_plan(id: str, body: ApproveRequest) -> dict[str, Any]:
+def apply_plan_approval(
+    id: str,
+    version: int,
+    decision: Literal["approve", "reject"],
+    kind: Literal["dispatch", "replan"],
+) -> dict[str, Any]:
     """
-    Handle plan approval or rejection (dispatch or replan).
-    Enforces valid state transitions, writes to approvals table,
-    updates status, and initializes watch_state.
+    Core approval logic called by both HTTP endpoint and Telegram callback.
+    Enforces valid state transitions, writes to approvals table, updates status,
+    initializes watch_state, and sends notifications.
     """
     now = datetime.now(UTC)
     now_iso = now.isoformat()
@@ -308,13 +353,13 @@ def approve_plan(id: str, body: ApproveRequest) -> dict[str, Any]:
         current_status = plan_row["status"]
 
         # Validate state transition
-        if body.kind == "dispatch":
+        if kind == "dispatch":
             if current_status != "awaiting_approval":
                 raise HTTPException(
                     status_code=409,
                     detail=f"Cannot approve dispatch for plan in status '{current_status}' (must be 'awaiting_approval')",
                 )
-            if body.decision == "approve":
+            if decision == "approve":
                 # dispatch+approve -> status "dispatched" then "monitoring"
                 conn.execute(
                     "UPDATE plans SET status = 'dispatched', updated_at = ? WHERE plan_id = ?",
@@ -348,21 +393,19 @@ def approve_plan(id: str, body: ApproveRequest) -> dict[str, Any]:
                 )
                 new_status = "rejected"
 
-        elif body.kind == "replan":
+        elif kind == "replan":
             if current_status != "replan_pending":
                 raise HTTPException(
                     status_code=409,
                     detail=f"Cannot approve replan for plan in status '{current_status}' (must be 'replan_pending')",
                 )
-            if body.decision == "approve":
-                # replan+approve -> that version becomes active (status "monitoring")
+            if decision == "approve":
                 conn.execute(
                     "UPDATE plans SET status = 'monitoring', updated_at = ? WHERE plan_id = ?",
                     (now_iso, id),
                 )
                 new_status = "monitoring"
             else:
-                # reject keeps current version, returns to monitoring
                 conn.execute(
                     "UPDATE plans SET status = 'monitoring', updated_at = ? WHERE plan_id = ?",
                     (now_iso, id),
@@ -375,31 +418,66 @@ def approve_plan(id: str, body: ApproveRequest) -> dict[str, Any]:
             INSERT INTO approvals(plan_id, version, kind, decision, by, ts)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (id, body.version, body.kind, body.decision, "operator", now_iso),
+            (id, version, kind, decision, "operator", now_iso),
         )
 
-    # Trigger notification
-    notify(
-        plan_id=id,
-        kind=f"{body.kind}_{body.decision}",
-        text=f"Plan {id} v{body.version} {body.kind} was {body.decision}d",
-    )
+        plan_a_mandi = "Mandi"
+        pv = conn.execute(
+            "SELECT planset_json FROM plan_versions WHERE plan_id = ? ORDER BY version DESC LIMIT 1",
+            (id,),
+        ).fetchone()
+        if pv and pv["planset_json"]:
+            try:
+                ps = json.loads(pv["planset_json"])
+                plan_a = next((p for p in ps.get("plans", []) if p.get("label") == "A"), None)
+                if plan_a:
+                    plan_a_mandi = plan_a.get("option", {}).get("mandi_name", "Mandi")
+            except Exception:
+                pass
+
+    from app.integrations.telegram import build_callback_data
+
+    if kind == "dispatch" and decision == "approve":
+        dispatch_buttons = [
+            {"text": "Passed next waypoint", "callback_data": build_callback_data("checkin", id, version, "passed:1")},
+            {"text": "Delayed +30 min", "callback_data": build_callback_data("checkin", id, version, "delay:30")},
+            {"text": "Delayed +60 min", "callback_data": build_callback_data("checkin", id, version, "delay:60")},
+            {"text": "Arrived", "callback_data": build_callback_data("checkin", id, version, "arrived")},
+        ]
+        notify(
+            plan_id=id,
+            kind="dispatch_approved",
+            text=f"Dispatched to {plan_a_mandi}. Send transit check-ins:",
+            buttons=dispatch_buttons,
+        )
+    else:
+        notify(
+            plan_id=id,
+            kind=f"{kind}_{decision}",
+            text=f"Plan {id} v{version} {kind} was {decision}d",
+        )
 
     return {
         "ok": True,
         "plan_id": id,
         "status": new_status,
-        "version": body.version,
-        "decision": body.decision,
+        "version": version,
+        "decision": decision,
     }
 
 
-@app.post("/plans/{id}/progress")
-def update_progress(id: str, body: ProgressInput) -> dict[str, Any]:
-    """
-    Update driver transit progress:
-    e.g. delay:30, delay:60, passed:2, arrived, or manual ETA.
-    """
+def apply_plan_progress(
+    id: str,
+    *,
+    delay: str | None = None,
+    passed: str | None = None,
+    arrived: bool | None = False,
+    reported_delay_min: float | None = None,
+    last_waypoint_idx: int | None = None,
+    manual_eta: str | None = None,
+    source: Literal["telegram_location", "checkin_button", "manual_eta", "route_estimate"] | None = "manual_eta",
+) -> dict[str, Any]:
+    """Core transit progress update called by both HTTP endpoint and Telegram callback."""
     now = datetime.now(UTC)
     now_iso = now.isoformat()
 
@@ -420,30 +498,28 @@ def update_progress(id: str, body: ProgressInput) -> dict[str, Any]:
         prog = DispatchProgress(plan_id=id, dispatched_at=now_iso)
 
     # Parse inputs
-    if body.delay:
-        # e.g. "delay:30" or "delay:60"
-        parts = body.delay.split(":")
+    if delay:
+        parts = delay.split(":")
         if len(parts) == 2:
             try:
                 prog.reported_delay_min = float(parts[1])
             except ValueError:
                 pass
-    elif body.reported_delay_min is not None:
-        prog.reported_delay_min = float(body.reported_delay_min)
+    elif reported_delay_min is not None:
+        prog.reported_delay_min = float(reported_delay_min)
 
-    if body.passed:
-        # e.g. "passed:2"
-        parts = body.passed.split(":")
+    if passed:
+        parts = passed.split(":")
         if len(parts) == 2:
             try:
                 prog.last_waypoint_idx = int(parts[1])
             except ValueError:
                 pass
-    elif body.last_waypoint_idx is not None:
-        prog.last_waypoint_idx = int(body.last_waypoint_idx)
+    elif last_waypoint_idx is not None:
+        prog.last_waypoint_idx = int(last_waypoint_idx)
 
-    if body.source:
-        prog.source = body.source
+    if source:
+        prog.source = source
 
     with get_conn() as conn:
         conn.execute(
@@ -457,6 +533,34 @@ def update_progress(id: str, body: ProgressInput) -> dict[str, Any]:
         )
 
     return {"ok": True, "plan_id": id, "progress": prog.model_dump()}
+
+
+@app.post("/plans/{id}/approve")
+def approve_plan(id: str, body: ApproveRequest) -> dict[str, Any]:
+    """
+    Handle plan approval or rejection (dispatch or replan).
+    Enforces valid state transitions, writes to approvals table,
+    updates status, and initializes watch_state.
+    """
+    return apply_plan_approval(id, body.version, body.decision, body.kind)
+
+
+@app.post("/plans/{id}/progress")
+def update_progress(id: str, body: ProgressInput) -> dict[str, Any]:
+    """
+    Update driver transit progress:
+    e.g. delay:30, delay:60, passed:2, arrived, or manual ETA.
+    """
+    return apply_plan_progress(
+        id=id,
+        delay=body.delay,
+        passed=body.passed,
+        arrived=body.arrived,
+        reported_delay_min=body.reported_delay_min,
+        last_waypoint_idx=body.last_waypoint_idx,
+        manual_eta=body.manual_eta,
+        source=body.source,
+    )
 
 
 @app.post("/plans/{id}/watch/tick")

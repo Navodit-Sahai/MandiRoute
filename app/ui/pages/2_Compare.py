@@ -431,5 +431,8 @@ if summary_text:
     st.subheader("Plain-language summary (template, numbers checked)")
     st.text(summary_text)
 
-# TODO: "Why not the highest-price mandi?" - engine function not yet available
+why_not_text = plan_res.get("why_not_text")
+if why_not_text:
+    st.subheader("Why not the highest-price mandi?")
+    st.text(why_not_text)
 
