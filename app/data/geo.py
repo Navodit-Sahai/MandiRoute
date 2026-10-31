@@ -80,6 +80,7 @@ _STATE_ALIASES = {
     "chattisgarh": "Chhattisgarh", "chhattisgarh": "Chhattisgarh",
     "uttrakhand": "Uttarakhand", "uttaranchal": "Uttarakhand",
     "orissa": "Odisha",
+    "keralam": "Kerala",                 # data.gov.in renamed the state (seen live 2026-10-31)
     "pondicherry": "Puducherry",
     "nct of delhi": "Delhi", "delhi": "Delhi", "new delhi": "Delhi",
     "jammu and kashmir": "Jammu and Kashmir", "jammu kashmir": "Jammu and Kashmir",

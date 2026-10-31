@@ -61,6 +61,8 @@ class PlanResponse(BaseModel):
     warnings: list[str] = []
     source_status: list[SourceStatus] = []
     trace_id: str
+    map_points: list[dict[str, Any]] = []
+    route_paths: dict[str, list[list[float]]] = {}
 
 
 # -----------------------------------------------------------------------------
@@ -122,6 +124,8 @@ def create_plan(req: DispatchRequest) -> PlanResponse:
         warnings=flow_result.assembly_warnings,
         source_status=flow_result.source_status,
         trace_id=flow_result.trace_id,
+        map_points=flow_result.map_points,
+        route_paths=flow_result.route_paths,
     )
 
 
@@ -136,7 +140,34 @@ def get_plan(id: str) -> dict[str, Any]:
             "SELECT * FROM plan_versions WHERE plan_id = ? ORDER BY version DESC", (id,)
         ).fetchall()
 
+        geo_row = conn.execute(
+            "SELECT result_summary FROM agent_trace WHERE plan_id = ? AND node = 'geo' ORDER BY id DESC LIMIT 1",
+            (id,),
+        ).fetchone()
+
+        assemble_row = conn.execute(
+            "SELECT result_summary FROM agent_trace WHERE plan_id = ? AND node = 'assemble' ORDER BY id DESC LIMIT 1",
+            (id,),
+        ).fetchone()
+
+    map_points: list[dict[str, Any]] = []
+    route_paths: dict[str, list[list[float]]] = {}
+    if geo_row and geo_row["result_summary"]:
+        try:
+            geo_data = json.loads(geo_row["result_summary"])
+            map_points = geo_data.get("map_points", [])
+            route_paths = geo_data.get("route_paths", {})
+        except Exception:
+            pass
+
+    warnings: list[str] = []
+    if assemble_row and assemble_row["result_summary"]:
+        warnings.append(assemble_row["result_summary"])
+
     latest = version_rows[0] if version_rows else None
+    planset = json.loads(latest["planset_json"]) if latest else None
+    coverage = planset.get("coverage") if planset else None
+
     return {
         "plan_id": plan_row["plan_id"],
         "request": json.loads(plan_row["request_json"]),
@@ -144,7 +175,11 @@ def get_plan(id: str) -> dict[str, Any]:
         "created_at": plan_row["created_at"],
         "updated_at": plan_row["updated_at"],
         "latest_version": latest["version"] if latest else None,
-        "planset": json.loads(latest["planset_json"]) if latest else None,
+        "planset": planset,
+        "coverage": coverage,
+        "map_points": map_points,
+        "route_paths": route_paths,
+        "warnings": warnings,
         "versions": [dict(v) for v in version_rows],
     }
 
@@ -182,4 +217,3 @@ def get_evidence_by_id(id: str) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail=f"Evidence '{id}' not found")
     return row
-

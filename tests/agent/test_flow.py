@@ -98,7 +98,9 @@ def test_flow_execution_and_trace(monkeypatch):
         assert len(rows) <= 12  # Step cap 12
         assert len(rows) >= 5
         steps = [r["node"] for r in rows]
-        assert steps == ["intake", "source_gate", "assemble", "decide", "explain", "done"]
+        assert steps == ["intake", "source_gate", "assemble", "decide", "geo", "explain", "done"]
         for r in rows:
             assert r["ok"] == 1
+        assert len(res.map_points) == 1
+        assert "FIXTURE_m1~r0" in res.route_paths
 

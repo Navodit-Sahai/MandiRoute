@@ -134,7 +134,8 @@ def _assemble(req: DispatchRequest, now: datetime, *, only: list[str] | None = N
                 if m not in present:
                     http.add_warning(f"{m}: no recent price record any more - cannot refresh this mandi")
         else:
-            ids = mandi.shortlist(fresh, req.origin, req.max_distance_km, cfg.candidate_k, geo)   # type: ignore[arg-type]
+            ids = mandi.shortlist(fresh, req.origin, req.max_distance_km, cfg.candidate_k, geo,   # type: ignore[arg-type]
+                                 state_order=states_for(req.origin_state))
         if not ids:
             http.add_warning("no candidate mandis within range with a located, recent price record")
             return _empty(col, extra)

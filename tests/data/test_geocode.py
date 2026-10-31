@@ -156,6 +156,7 @@ def test_nominatim_calls_are_spaced_by_the_limiter(clock, monkeypatch):
 def test_state_aliases_match():
     from app.data.geo import same_state, state_in_text
     assert same_state("Chattisgarh", "Chhattisgarh") and same_state("NCT of Delhi", "Delhi")
+    assert same_state("Keralam", "Kerala") and same_state("kerala", "KERALAM")
     assert not same_state("Goa", "Karnataka") and not same_state("", "")
     assert state_in_text("Maharashtra", "Pune, Maharashtra, India") and not state_in_text("Goa", "Panaji, Gao")
 

@@ -263,3 +263,27 @@ def test_select_grade_most_mandis_then_alphabetical_and_wildcard_grouping():
     g = mandi.group_by_mandi(recs, None, "Local")                      # variety wildcard
     assert set(g) == {mandi_id("Maharashtra", "Nashik", "A"), mandi_id("Maharashtra", "Nashik", "B")}
     assert len(mandi.group_by_mandi(recs, "Other", "Local")) == 1      # exact pin still works
+
+
+def test_shortlist_spends_geocoding_budget_on_origin_state_first():
+    recs = [_norm(state="Bihar", market="Early", district="DB"), _norm(state="Uttar Pradesh", market="Home", district="DU")]
+    geo = FakeGeo(district={"DB": _g(25.6, 85.1, "district_centroid", cached=False),
+                            "DU": _g(26.9, 81.0, "district_centroid", cached=False)})
+    o = LatLon(lat=26.85, lon=80.95)
+    # alphabetical order would give the single lookup to Bihar; with state_order UP gets it
+    ids = mandi.shortlist(recs, o, 500, 8, geo, net_budget=1, state_order=["Uttar Pradesh", "Bihar"])
+    assert ids == [mandi_id("Uttar Pradesh", "DU", "Home")]
+    ids2 = mandi.shortlist(recs, o, 500, 8, geo, net_budget=1)
+    assert ids2 == [mandi_id("Bihar", "DB", "Early")]
+
+
+@responses.activate
+def test_keralam_spelling_is_tried_and_records_are_accepted():
+    def cb(request):
+        q = parse_qs(urlparse(request.url).query)
+        st = (q.get("filters[state.keyword]") or [""])[0]
+        rows = [FIXTURE_record(state="Keralam", district="Thrissur", market="Thrissur")] if st == "Keralam" else []
+        return 200, {}, json.dumps({"total": len(rows), "records": rows})
+    responses.add_callback(responses.GET, mandi.RESOURCE_URL, callback=cb)
+    mf = mandi.fetch_mandi_records("Tomato", ["Kerala"], "K", FIXTURE_NOW)
+    assert len(mf.records) == 1 and mf.records[0].state == "Keralam"
