@@ -2,7 +2,7 @@
 B9 - Triggers, hysteresis, recompute, diff (BLUEPRINT B9, PLAN 7.9). Pure, no I/O.
 
 T1 ETA slip >= A's eta_slip_h reconsider threshold. T2 window-miss scenarios >= WINDOW_MISS_TRIGGER
-(or A missed at nominal). T3 remaining-route rain up >= RAIN_TRIGGER_DELTA_MM vs plan time.
+(or A missed at nominal). T3 remaining-route rain up >= cfg.rain_trigger_delta_mm (CR-6) vs plan time.
 T4 ripening: DISABLED unless cfg.ripening_enabled (SR-1). T5 new daily price record at or below
 A's price-flip boundary: an event, fires at most once per record, no hysteresis.
 T6 river-flow proxy: advisory only, never fires, never recomputes.
@@ -23,7 +23,6 @@ from app.contracts import (
 from app.engine.plans import build_plan_set
 from app.engine.scenarios import evaluate_option
 
-RAIN_TRIGGER_DELTA_MM: float = 5.0   # ASSUMPTION: remaining-route rain increase that counts as T3
 HYSTERESIS_TRIGGERS: tuple[str, ...] = ("T1", "T2", "T3", "T4")
 REASON_PRIORITY: tuple[str, ...] = ("T2", "T1", "T5", "T3", "T4")
 TRIGGER_TEXT: dict[str, str] = {
@@ -195,7 +194,7 @@ def evaluate_triggers_and_recompute(
         if _misses(cur) >= cfg.window_miss_trigger or _nominal(cur).window_status == "missed":
             fired.append("T2")
         if (cur.rain_exposure_mm is not None and opt_a.rain_exposure_mm is not None
-                and cur.rain_exposure_mm - opt_a.rain_exposure_mm >= RAIN_TRIGGER_DELTA_MM):
+                and cur.rain_exposure_mm - opt_a.rain_exposure_mm >= cfg.rain_trigger_delta_mm):
             fired.append("T3")
         if cfg.ripening_enabled and cur.ripening is not None and cur.ripening.worst_consumed_pct is not None \
                 and cur.ripening.worst_consumed_pct >= req.ripening_limit_pct:

@@ -132,3 +132,22 @@ def test_river_flow_is_advisory_and_t4_disabled():
                    label="river flow proxy percentile", value=99.0, source="FIXTURE", fetched_at=FIXTURE_NOW.isoformat())]
     d = _tick(WatchState(), delay_min=0.0, ev=ev)
     assert "advisory" in d.reason and "T6" not in d.fired and "T4" not in d.fired and not d.propose_replan
+
+
+def test_cr6_rain_trigger_delta_from_settings():
+    """CR-6: T3 threshold comes from cfg.rain_trigger_delta_mm (default 5.0), not a module constant."""
+    from app.config import Settings
+    from tests.engine.test_plans import FIXTURE_with_weather
+
+    assert Settings().rain_trigger_delta_mm == 5.0
+    base = [FIXTURE_with_weather(FIXTURE_cand("m1", 1500, "20:00")), FIXTURE_cand("m2", 1480, "20:00")]
+    prev = build_plan_set(FIXTURE_REQ, base, [], FIXTURE_NOW, FIXTURE_CFG, plan_id="p1")
+    wet_route = base[0].routes[0]
+    wet = base[0].model_copy(update={"routes": [wet_route.model_copy(update={
+        "weather": [w.model_copy(update={"precip_mm": 4.0}) for w in wet_route.weather]})]})
+    fresh = [wet, base[1]]   # rain on A's route rises from 2.0 to 4.0 mm per point
+    rise = sum(4.0 - 2.0 for _ in wet_route.weather)
+    for delta, expect in ((rise - 0.5, True), (rise + 0.5, False)):
+        cfg = FIXTURE_CFG.model_copy(update={"rain_trigger_delta_mm": delta})
+        d = evaluate_triggers_and_recompute(prev, FIXTURE_REQ, fresh, [], _prog(0.0), WatchState(), FIXTURE_NOW, cfg)
+        assert ("T3" in d.fired) is expect

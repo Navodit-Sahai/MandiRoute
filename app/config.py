@@ -70,6 +70,7 @@ class Settings(BaseModel):
     replan_margin_rel: float = 0.02              # ASSUMPTION
     cooldown_min: int = 30                       # DESIGN
     window_miss_trigger: int = 3                 # DESIGN
+    rain_trigger_delta_mm: float = 5.0           # ASSUMPTION: CR-6, remaining-route rain increase for T3
 
     # ------------------------------------------------------ caching / limits
     cache_ttl_s: dict[str, float | None] = {     # seconds; None = never expires
