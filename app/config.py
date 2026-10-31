@@ -1,145 +1,90 @@
-<<<<<<< HEAD
-"""Assumptions Registry (PLAN.md section 6) + tiny .env loader. Shared, frozen after G0.
-
-Only thresholds/assumptions live here (no magic numbers in logic). Secrets are read from the
-environment ONLY (NN-12) via the small accessors at the bottom; they are never logged.
-No python-dotenv dependency (not in PLAN section 3) -> a 15-line loader is used instead.
 """
-from __future__ import annotations
-import os
-from functools import lru_cache
-from pathlib import Path
-from pydantic import BaseModel, ConfigDict
+Assumptions Registry (PLAN.md section 6) + tiny .env loader. Shared, frozen after G0.
 
-
-class Settings(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    delay_mult: dict[str, float] = {"none": 0.0, "moderate": 0.25, "severe": 0.60}   # ASSUMPTION
-    cvar_q: float = 0.25                                                             # design
-    eps_abs_rs: float = 500.0                                                        # ASSUMPTION
-    eps_rel: float = 0.03                                                            # ASSUMPTION
-    next_day_wait_h: float = 12.0                                                    # ASSUMPTION
-    offsets_c: dict[str, list[float]] = {                                            # ASSUMPTION
-        "open": [0.0, 5.0, 10.0], "covered": [0.0, 3.0, 6.0], "refrigerated": [0.0]}
-    ripening_limit_pct: float = 25.0                                                 # user threshold
-    handbook_alert_transport_h: float = 12.0
-    handbook_alert_cargo_c: float = 25.0
-    price_degrade_days: int = 3                                                      # ASSUMPTION
-    price_abstain_days: int = 7                                                      # ASSUMPTION
-    candidate_k: int = 8                                                             # design
-    waypoint_spacing_km: float = 25.0                                                # design
-    max_waypoints: int = 8                                                           # design
-    departure_slots_h: tuple[int, ...] = (2, 4, 8, 12)                               # design
-    poll_interval_s: int = 300                                                       # design
-    poll_interval_demo_s: int = 30
-    hysteresis_n: int = 2                                                            # design
-    replan_margin_abs_rs: float = 1000.0                                             # ASSUMPTION
-    replan_margin_rel: float = 0.02                                                  # ASSUMPTION
-    cooldown_min: int = 30                                                           # design
-    window_miss_trigger: int = 3                                                     # design
-    # seconds; None = never expires
-    cache_ttl_s: dict[str, float | None] = {
-        "mandi": 60 * 60, "weather": 30 * 60, "routes": 24 * 3600, "geocode": None}
-    # minimum seconds between calls to the same host (policy)
-    rate_limit_interval_s: dict[str, float] = {"osrm": 1.0, "nominatim": 1.0}
-=======
-"""
 ALL tunable numbers of the project live HERE (and nowhere else).
-
-Important: these are NOT "examples". They are the project's ASSUMPTIONS REGISTRY
-(PLAN.md section 6). Every value is tagged:
+Every value is tagged:
     ASSUMPTION : our own choice with no verified India-specific source -> must be visible in the UI
     DESIGN     : an engineering choice (not a claim about the real world)
     POLICY     : forced by an API provider's usage policy
-    VERIFIED   : taken from a source we actually read (source named in the comment)
-
-Values that must be REPLACED with Person 2's real test results are marked:
-    TODO(PERSON-2-RESULT)
+    VERIFIED   : taken from a source we actually read
 """
 from __future__ import annotations
 
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-# Folder locations (calculated from where this file sits, so they work on any laptop)
+# Folder locations
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_DIR = REPO_ROOT / "data" / "reference"
 
+# CR-5: Ripening feature flag
+RIPENING_ENABLED: bool = False
+
 
 class Settings(BaseModel):
-    # "frozen" = nobody can change a setting while the program runs (no accidental edits)
     model_config = ConfigDict(frozen=True)
 
     # ------------------------------------------------------------------ time
     timezone_name: str = "Asia/Kolkata"          # DESIGN: all user-facing times are Indian time
 
     # ------------------------------------------------- delay stress scenarios
-    # Delay is expressed as a fraction of the normal travel time.
-    # 0.25 means "the trip takes 25% longer than the route planner says".
-    # ASSUMPTION: no India-specific verified source. Shown in the UI and user-adjustable.
-    delay_mult: dict[str, float] = {"none": 0.0, "moderate": 0.25, "severe": 0.60}
+    delay_mult: dict[str, float] = {"none": 0.0, "moderate": 0.25, "severe": 0.60}   # ASSUMPTION
 
     # ------------------------------------------------------- scoring of plans
-    cvar_q: float = 0.25            # DESIGN: Plan A score = average of the worst 25% of scenarios
-    eps_abs_rs: float = 500.0       # ASSUMPTION: A "fails" in a scenario if the best plan beats it by more than this (Rs)...
-    eps_rel: float = 0.03           # ASSUMPTION: ...or by more than this fraction of A's own net value (whichever is larger)
-    next_day_wait_h: float = 12.0   # ASSUMPTION: hours of waiting if we miss the mandi's closing time
+    cvar_q: float = 0.25                         # DESIGN: Plan A score = average of worst 25%
+    eps_abs_rs: float = 500.0                    # ASSUMPTION
+    eps_rel: float = 0.03                        # ASSUMPTION
+    next_day_wait_h: float = 12.0                # ASSUMPTION
 
     # ---------------------------------------------------- tomato ripening
-    # Assumed (cargo temperature - outside temperature), in degrees C.
-    # ASSUMPTION. Only weak evidence: one non-Indian study reported exposed fruit
-    # 10-15 C above air temperature. Shown as a RANGE, never as one exact number.
-    offsets_c: dict[str, list[float]] = {
+    ripening_enabled: bool = False               # CR-5 (scope request SR-1)
+    ripening_limit_pct: float = 25.0             # user threshold
+    offsets_c: dict[str, list[float]] = {        # ASSUMPTION
         "open": [0.0, 5.0, 10.0],
         "covered": [0.0, 3.0, 6.0],
-        "refrigerated": [0.0],      # refrigerated: we use the set-point itself
+        "refrigerated": [0.0],
     }
-    # Below this temperature mature-green tomatoes risk chilling injury.
-    # VERIFIED: UC Davis postharvest note (mature-green tomatoes are held at 12.5-15 C).
-    chilling_threshold_c: float = 12.5
-    # One handbook says: avoid transport longer than 12 hours if tomato temperature is above 25 C.
-    # Guidance from ONE handbook only (not India-calibrated). Used for an alert message, not for money.
+    chilling_threshold_c: float = 12.5           # VERIFIED: UC Davis note
     handbook_alert_hours: float = 12.0
     handbook_alert_temp_c: float = 25.0
 
     # ----------------------------------------------------- data freshness
-    price_degrade_days: int = 3     # ASSUMPTION: price record older than this -> recommendation is downgraded
-    price_abstain_days: int = 7     # ASSUMPTION: price record older than this -> system abstains
+    price_degrade_days: int = 3                  # ASSUMPTION
+    price_abstain_days: int = 7                  # ASSUMPTION
 
     # -------------------------------------------------- candidates & routes
-    candidate_k: int = 8                  # DESIGN: how many nearest mandis we route (rate limits!)
-    waypoint_spacing_km: float = 25.0     # DESIGN: one sample point every ~25 km on a route
-    max_waypoints: int = 8                # DESIGN: never more than this many sample points per route
-    departure_slots_h: list[float] = [2.0, 4.0, 8.0, 12.0]   # DESIGN: Plan C tries leaving this many hours later
+    candidate_k: int = 8                         # DESIGN
+    waypoint_spacing_km: float = 25.0            # DESIGN
+    max_waypoints: int = 8                       # DESIGN
+    departure_slots_h: list[float] = [2.0, 4.0, 8.0, 12.0]   # DESIGN
 
     # ------------------------------------------------------------ monitoring
-    poll_interval_s: int = 300            # DESIGN: watchdog checks every 5 minutes (use ~30 for demos)
-    hysteresis_n: int = 2                 # DESIGN: a trigger must hold for this many checks in a row
-    replan_margin_abs_rs: float = 1000.0  # ASSUMPTION: only propose a change if it gains at least this many Rs...
-    replan_margin_rel: float = 0.02       # ASSUMPTION: ...or this fraction of the current plan's value
-    cooldown_min: int = 30                # DESIGN: after proposing a change, stay quiet this long
-    window_miss_trigger: int = 3          # DESIGN: trigger if Plan A misses the window in this many of 9 scenarios
+    poll_interval_s: int = 300                   # DESIGN: 5 minutes (demo ~30s)
+    poll_interval_demo_s: int = 30
+    hysteresis_n: int = 2                        # DESIGN
+    replan_margin_abs_rs: float = 1000.0         # ASSUMPTION
+    replan_margin_rel: float = 0.02              # ASSUMPTION
+    cooldown_min: int = 30                       # DESIGN
+    window_miss_trigger: int = 3                 # DESIGN
 
     # ------------------------------------------------------ caching / limits
-    cache_ttl_min: dict[str, int] = {"mandi": 60, "weather": 30, "routes": 1440}   # DESIGN (minutes)
-    osrm_min_interval_s: float = 1.0        # POLICY: OSRM demo server allows at most 1 request/second
-    nominatim_min_interval_s: float = 1.0   # POLICY: Nominatim allows at most 1 request/second
+    cache_ttl_s: dict[str, float | None] = {     # seconds; None = never expires
+        "mandi": 60 * 60, "weather": 30 * 60, "routes": 24 * 3600, "geocode": None}
+    cache_ttl_min: dict[str, int] = {"mandi": 60, "weather": 30, "routes": 1440}
+    rate_limit_interval_s: dict[str, float] = {"osrm": 1.0, "nominatim": 1.0}
+    osrm_min_interval_s: float = 1.0             # POLICY
+    nominatim_min_interval_s: float = 1.0        # POLICY
 
-    # --------------------------------------- facts only Person 2 can confirm
-    # TODO(PERSON-2-RESULT): set to True ONLY after Person 2 confirms the price unit
-    #                        (Rs per quintal) from a real data.gov.in response (module A1/A3).
+    # --------------------------------------- facts confirmed at gates
     price_unit_verified: bool = False
-    # TODO(PERSON-2-RESULT): set to True ONLY if Person 2's Telegram test (A1) received
-    #                        live-location updates. Until then we rely on check-in buttons.
     telegram_live_location_verified: bool = False
 
     @model_validator(mode="after")
     def _sanity_checks(self):
-        """Catch typing mistakes in the settings above as early as possible."""
         d = self.delay_mult
         if set(d) != {"none", "moderate", "severe"}:
             raise ValueError("delay_mult must have exactly the keys: none, moderate, severe")
@@ -152,28 +97,36 @@ class Settings(BaseModel):
         if self.price_degrade_days > self.price_abstain_days:
             raise ValueError("price_degrade_days must not exceed price_abstain_days")
         return self
->>>>>>> origin/main
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-<<<<<<< HEAD
     return Settings()
 
 
-# ---------------- .env loader (does not override variables already set) ----------------
-def load_env(path: str | os.PathLike[str] = ".env") -> None:
-    p = Path(path)
-    if not p.is_file():
+def load_env_file(path: Path | str | None = None) -> None:
+    """
+    Read a ".env" file (lines like KEY=value) into os.environ.
+    - Lines starting with # are comments; text after ' #' is ignored.
+    - Existing environment variables are never overwritten.
+    - Secrets are never printed or logged.
+    """
+    env_path = Path(path) if path else (REPO_ROOT / ".env")
+    if not env_path.exists() or not env_path.is_file():
         return
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        k, v = line.split("=", 1)
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
+        key, _, value = line.partition("=")
+        value = value.split(" #", 1)[0].strip().strip('"').strip("'")
+        key = key.strip()
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def load_env(path: str | os.PathLike[str] = ".env") -> None:
+    load_env_file(path)
 
 
 def env(name: str, default: str | None = None) -> str | None:
@@ -192,32 +145,9 @@ def price_unit_verified() -> bool:
 
 
 def _autoload() -> None:
-    """Load .env from the repo root and the working directory (existing env vars win)."""
-    load_env(Path(__file__).resolve().parents[1] / ".env")
-    load_env(".env")
+    """Load .env from the repo root and current working directory."""
+    load_env_file(REPO_ROOT / ".env")
+    load_env_file(".env")
 
 
 _autoload()
-=======
-    """Return the one shared Settings object (created once)."""
-    return Settings()
-
-
-def load_env_file(path: Path | None = None) -> None:
-    """
-    Read a ".env" file (lines like KEY=value) into environment variables.
-    - Lines starting with # are comments; text after " #" on a line is ignored.
-    - A variable that is ALREADY set in the real environment is never overwritten.
-    - Secrets are not printed or logged anywhere.
-    """
-    env_path = path or (REPO_ROOT / ".env")
-    if not env_path.exists():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        value = value.split(" #", 1)[0].strip().strip('"').strip("'")
-        os.environ.setdefault(key.strip(), value)
->>>>>>> origin/main

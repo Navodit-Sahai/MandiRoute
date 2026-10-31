@@ -52,6 +52,13 @@ def test_person2_flags_default_to_not_verified():
     assert s.telegram_live_location_verified is False
 
 
+def test_cr5_ripening_disabled_by_default():
+    from app.config import RIPENING_ENABLED
+    s = get_settings()
+    assert s.ripening_enabled is False
+    assert RIPENING_ENABLED is False
+
+
 def test_settings_are_frozen():
     with pytest.raises(ValidationError):
         get_settings().cvar_q = 0.5
