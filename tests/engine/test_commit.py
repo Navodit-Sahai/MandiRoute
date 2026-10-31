@@ -7,6 +7,7 @@ from app.config import Settings
 from app.contracts import CandidateInputs, DispatchRequest, LatLon, PlanOption
 from app.contracts.inputs import Costs, RouteOption, Waypoint
 from app.engine.commit import compute_commit_points, last_feasible_waypoint
+from app.engine.units import delayed_arrival, window_status
 
 IST = timezone(timedelta(hours=5, minutes=30))
 FIXTURE_DEPART = datetime(2026, 10, 31, 2, 0, tzinfo=IST)
@@ -65,10 +66,10 @@ def test_waypoint_zero_vs_last():
 def test_monotone_in_delay():
     route = FIXTURE_route()
     for closing_h in range(3, 14):
-        deadline = FIXTURE_DEPART.replace(hour=closing_h)
         prev = 10**6
         for step in range(0, 21):
-            lf = last_feasible_waypoint(FIXTURE_DEPART, route, "FIXTURE_mB", deadline, step * 0.05)
+            lf = last_feasible_waypoint(FIXTURE_DEPART, route, "FIXTURE_mB", f"{closing_h:02d}:00", step * 0.05,
+                                        FIXTURE_CFG.timezone_name)
             cur = -1 if lf is None else lf
             assert cur <= prev
             prev = cur
@@ -84,3 +85,17 @@ def test_scenarios_reported_and_non_increasing():
 def test_note_always_approximate():
     for closing in (None, "02:30", "06:00", "23:00"):
         assert "approximate" in _commit(closing).note
+
+
+def test_midnight_crossing_uses_b4_arrival_date_rule():
+    # Depart 22:00; from wp i the eta at B is 22:00 + (2i+1) h -> 23:00, 01:00, 03:00, 05:00 (next day).
+    late = FIXTURE_DEPART.replace(hour=22)
+    route = FIXTURE_route()
+    for closing in ("23:30", "02:00", "04:00"):
+        lf = last_feasible_waypoint(late, route, "FIXTURE_mB", closing, 0.0, FIXTURE_CFG.timezone_name)
+        met = [wp.idx for wp in route.waypoints
+               if window_status(delayed_arrival(late, wp.elapsed_nominal_s + wp.to_dest_s["FIXTURE_mB"], 0.0),
+                                closing, FIXTURE_CFG.timezone_name) == "met"]
+        assert lf == (max(met) if met else None)
+    # 02:00 closing: 23:00 is "missed" on its own day, 01:00 next day is "met" (B4 rule) -> wp 1
+    assert last_feasible_waypoint(late, route, "FIXTURE_mB", "02:00", 0.0, FIXTURE_CFG.timezone_name) == 1

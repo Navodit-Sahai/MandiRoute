@@ -233,3 +233,64 @@ def test_deterministic_tie_break():
     assert ps.plans[0].option.mandi_id == "m1"
     assert ps.plans[1].label == "B"
     assert ps.plans[1].option.mandi_id == "m2"
+
+
+# -----------------------------------------------------------------------------
+# Reviewer additions: C rain, B6/B7 integration, robustness tie-break, missing weather
+# -----------------------------------------------------------------------------
+def FIXTURE_with_weather(cand: CandidateInputs) -> CandidateInputs:
+    route = cand.routes[0]
+    wx = [WeatherSample(waypoint_idx=w.idx, time_iso="2026-10-31T06:00", temp_c=25.0, precip_mm=2.0,
+                        evidence_id=f"ev_wx_{w.idx}") for w in route.waypoints]
+    wps = [w.model_copy(update={"to_dest_s": {"m2": 3600.0}}) for w in route.waypoints]
+    return cand.model_copy(update={"routes": [route.model_copy(update={"weather": wx, "waypoints": wps})]})
+
+
+def test_plan_c_rain_is_none_never_reused_from_a():
+    c1 = FIXTURE_with_weather(FIXTURE_cand("m1", "Mandi 1", low=2500, typical=3000, high=3500, closing="23:00"))
+    c2 = FIXTURE_cand("m2", "Mandi 2", low=1500, typical=1800, high=2000, closing="23:00")
+    ps = build_plan_set(FIXTURE_request(), [c1, c2], [], FIXTURE_NOW, FIXTURE_CFG, plan_id="p_rain")
+    by = {p.label: p for p in ps.plans}
+    assert by["A"].option.rain_exposure_mm == 4.0
+    assert by["C"].option.rain_exposure_mm is None
+
+
+def test_rain_none_when_route_weather_missing():
+    c1 = FIXTURE_cand("m1", "Mandi 1", low=2500, typical=3000, high=3500)
+    ps = build_plan_set(FIXTURE_request(), [c1], [], FIXTURE_NOW, FIXTURE_CFG, plan_id="p_nowx")
+    assert ps.plans[0].option.rain_exposure_mm is None
+
+
+def test_commit_flip_and_conditions_filled_from_engine():
+    # A (m1) closes 08:30; nominal arrival 07:00 -> late with delay; B (m2) slightly cheaper, closes late.
+    c1 = FIXTURE_with_weather(FIXTURE_cand("m1", "Mandi 1", low=2400, typical=2600, high=2800, closing="08:30"))
+    c2 = FIXTURE_cand("m2", "Mandi 2", low=2380, typical=2580, high=2780, closing="23:00")
+    ps = build_plan_set(FIXTURE_request(), [c1, c2], [], FIXTURE_NOW, FIXTURE_CFG, plan_id="p_int")
+    a = ps.plans[0]
+    assert a.label == "A" and a.option.mandi_id == "m1"
+    assert a.commit.computed is True and "approximate" in a.commit.note
+    assert set(a.commit.last_feasible_waypoint) == {"none", "moderate", "severe"}
+    assert a.flip.note and "approximate" in a.flip.note
+    kinds = {c.kind: c for c in a.reconsider_if}
+    assert "ripening_pct" not in kinds
+    assert kinds["window_miss_scenarios"].threshold == FIXTURE_CFG.window_miss_trigger
+    assert a.flip.delay_flip_pct is not None
+    assert kinds["eta_slip_h"].threshold == round(a.flip.delay_flip_pct / 100 * a.option.duration_h_nominal, 2)
+    if "price_drop_pct" in kinds:
+        expected = (2600 - a.flip.price_flip_per_qtl) / 2600 * 100
+        assert abs(kinds["price_drop_pct"].threshold - expected) < 0.1
+
+
+def test_commit_not_computed_when_b_closing_unknown():
+    c1 = FIXTURE_cand("m1", "Mandi 1", low=2500, typical=3000, high=3500)
+    c2 = FIXTURE_cand("m2", "Mandi 2", low=1500, typical=1800, high=2000, closing=None)
+    a = build_plan_set(FIXTURE_request(), [c1, c2], [], FIXTURE_NOW, FIXTURE_CFG, plan_id="p_nc").plans[0]
+    assert a.commit.computed is False and "approximate" in a.commit.note
+
+
+def test_robustness_tie_goes_to_a_by_tie_break():
+    c1 = FIXTURE_cand("m1", "Mandi 1", low=2000, typical=2500, high=3000)
+    c2 = FIXTURE_cand("m2", "Mandi 2", low=2000, typical=2500, high=3000)
+    ps = build_plan_set(FIXTURE_request(), [c2, c1], [], FIXTURE_NOW, FIXTURE_CFG, plan_id="p_tie")
+    assert ps.plans[0].option.mandi_id == "m1"   # option_id ascending
+    assert ps.robustness_a_best_in == 9

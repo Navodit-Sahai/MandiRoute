@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.contracts import CandidateInputs, DispatchRequest, FlipBoundaries, PlanOption, RouteOption
-from app.engine.commit import closing_deadline, last_feasible_waypoint
+from app.engine.commit import last_feasible_waypoint
 from app.engine.netvalue import net_breakdown
 from app.engine.scenarios import evaluate_option
 
@@ -46,8 +46,8 @@ def compute_flips(req: DispatchRequest, plan_a: PlanOption, plan_b: PlanOption, 
     diversion: bool | None = None
     closing_b = cand_b.latest_arrival_local or req.mandi_latest_arrival.get(cand_b.mandi_id)
     if delay_flip is not None and closing_b is not None:
-        deadline = closing_deadline(depart, closing_b, cfg.timezone_name)
-        diversion = last_feasible_waypoint(depart, route_a, cand_b.mandi_id, deadline, delay_flip) is not None
+        diversion = last_feasible_waypoint(depart, route_a, cand_b.mandi_id, closing_b, delay_flip,
+                                           cfg.timezone_name) is not None
 
     wait_h = cfg.next_day_wait_h if _nominal(plan_a).window_status == "missed" else 0.0
     bd = net_breakdown(req, cand_a.price.typical, route_a.distance_km, wait_h)

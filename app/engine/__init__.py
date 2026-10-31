@@ -1,7 +1,9 @@
 """
 app.engine - Decision Engine modules.
 """
+from app.engine.commit import compute_commit_points, last_feasible_waypoint
 from app.engine.coverage import grade_coverage
+from app.engine.flips import compute_flips
 from app.engine.netvalue import net_breakdown, net_value
 from app.engine.plans import build_plan_set
 from app.engine.scenarios import evaluate_option, option_sort_key, sort_options
@@ -17,6 +19,9 @@ from app.engine.units import (
 )
 
 __all__ = [
+    "compute_commit_points",
+    "compute_flips",
+    "last_feasible_waypoint",
     "build_plan_set",
     "delayed_arrival",
     "evaluate_option",

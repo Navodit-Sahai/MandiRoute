@@ -10,9 +10,38 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from app.config import Settings
-from app.contracts import CandidateInputs, CoverageReport, DispatchRequest, Evidence, Plan, PlanOption, PlanSet
+from app.contracts import (
+    CandidateInputs, Condition, CoverageReport, DispatchRequest, Evidence, Plan, PlanOption, PlanSet, RouteOption,
+)
+from app.engine.commit import compute_commit_points
 from app.engine.coverage import grade_coverage
+from app.engine.flips import compute_flips
 from app.engine.scenarios import evaluate_option, sort_options
+
+
+def _find_route(cand: CandidateInputs, route_id: str) -> RouteOption:
+    return next(r for r in cand.routes if r.route_id == route_id)
+
+
+def _reconsider_conditions(opt_a: PlanOption, typical_a: float, delay_flip_pct: float | None,
+                           price_flip: float | None, cfg: Settings) -> list[Condition]:
+    """Reconsider-if rules for A (PLAN 7.6). Every number comes from the engine; no ripening rule (SR-1)."""
+    conds: list[Condition] = []
+    if delay_flip_pct is not None:
+        slip_h = delay_flip_pct / 100.0 * opt_a.duration_h_nominal
+        conds.append(Condition(kind="eta_slip_h", comparison=">=", threshold=round(slip_h, 2),
+                               rationale=f"a delay of {delay_flip_pct:g}% of normal travel time makes B better than A"))
+    if price_flip is not None and 0 < price_flip < typical_a:
+        drop_pct = (typical_a - price_flip) / typical_a * 100.0
+        conds.append(Condition(kind="price_drop_pct", comparison=">=", threshold=round(drop_pct, 1),
+                               rationale=f"below Rs {price_flip:,.0f}/qtl typical price at A, B is better"))
+    conds.append(Condition(kind="window_miss_scenarios", comparison=">=", threshold=float(cfg.window_miss_trigger),
+                           rationale=f"A misses the closing time in {cfg.window_miss_trigger} or more tested scenarios"))
+    return conds
+
+
+def _typical_price(cands: list[CandidateInputs], mandi_id: str) -> float:
+    return next(c.price.typical for c in cands if c.mandi_id == mandi_id and c.price is not None)
 
 
 def build_plan_set(
@@ -120,6 +149,17 @@ def build_plan_set(
         plan_b: Plan = Plan(label="B", option=best_b_opt, role_note=b_note)
         plans.append(plan_b)
 
+        # Commitment points (B6) and flip boundaries (B7): A monitored, B the alternative
+        cand_by_id: dict[str, CandidateInputs] = {c.mandi_id: c for c in priced_cands}
+        cand_a: CandidateInputs = cand_by_id[opt_a.mandi_id]
+        cand_b: CandidateInputs = cand_by_id[best_b_opt.mandi_id]
+        route_a: RouteOption = _find_route(cand_a, opt_a.route_id)
+        plan_a.commit = compute_commit_points(req, opt_a, route_a, best_b_opt, cand_b, cfg)
+        plan_a.flip = compute_flips(req, opt_a, best_b_opt, cand_a, cand_b, route_a, cfg)
+    plan_a.reconsider_if = _reconsider_conditions(
+        opt_a, _typical_price(priced_cands, opt_a.mandi_id), plan_a.flip.delay_flip_pct,
+        plan_a.flip.price_flip_per_qtl, cfg)
+
     # 4. Plan C = best over departure slots
     c_pool: list[PlanOption] = []
     slots: list[float] = getattr(cfg, "departure_slots_h", [2.0, 4.0, 8.0, 12.0])
@@ -137,7 +177,8 @@ def build_plan_set(
                     cfg=cfg,
                     wait_hours_after=slot_hours,
                 )
-                c_pool.append(opt_c)
+                # Route weather is aligned to the preferred departure only -> no rain figure for C
+                c_pool.append(opt_c.model_copy(update={"rain_exposure_mm": None}))
 
     if c_pool:
         best_c_opt: PlanOption = sort_options(c_pool)[0]

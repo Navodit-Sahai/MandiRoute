@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from app.config import Settings
 from app.contracts import CandidateInputs, DispatchRequest, LatLon
 from app.contracts.inputs import Costs, PriceBand, RouteOption, Waypoint
-from app.engine.commit import closing_deadline, last_feasible_waypoint
+from app.engine.commit import last_feasible_waypoint
 from app.engine.flips import compute_flips
 from app.engine.netvalue import net_value
 from app.engine.scenarios import evaluate_option
@@ -78,8 +78,8 @@ def test_none_when_b_never_wins():
 
 def test_diversion_consistent_with_b6():
     req, plan_b, route_a, flips = _setup()
-    deadline = closing_deadline(FIXTURE_DEPART, "07:00", FIXTURE_CFG.timezone_name)
-    lf = last_feasible_waypoint(FIXTURE_DEPART, route_a, "FIXTURE_mB", deadline, flips.delay_flip_pct / 100)
+    lf = last_feasible_waypoint(FIXTURE_DEPART, route_a, "FIXTURE_mB", "07:00", flips.delay_flip_pct / 100,
+                                FIXTURE_CFG.timezone_name)
     assert flips.diversion_feasible_at_flip is (lf is not None)
     _, _, _, unknown = _setup(b_closing=None)
     assert unknown.diversion_feasible_at_flip is None
