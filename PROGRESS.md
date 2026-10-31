@@ -68,6 +68,7 @@
 | C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
 | C4 | Watchdog + monitoring endpoints | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | `app/agent/watchdog.py`, `app/api/main.py`; tick, progress, approve, notify, diff endpoints |
 | C5 (Part 1) | Streamlit UI (Plan & Compare screens) | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | Screens 1 & 2 done; PyDeck map, A/B/C cards, format_inr, no forbidden words |
+| C5 (Part 2) | Dispatch & Monitor screen + what-if endpoint | DONE (awaiting review) | stream-c | 37 tests | 2026-10-31 | _Dispatch.py\, \POST /plans/{id}/whatif\, \GET /plans/{id}/events\, candidate trace blob, red-box what-if tagged \[what_if]\ |
 | C6 | What-if + Flip Finder (P1) | NOT_STARTED | | | | |
 | C7 | E2E tests + rehearsal | NOT_STARTED | | | | |
 
@@ -294,3 +295,21 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Verification: live Pune plan `e523b823` exercised through approve (`monitoring`), progress #1 (`reported_delay_min: 60.0`), tick #1, progress #2, and tick #2.
 
 
+### 2026-10-31 · Stream C · session-C5-part2 · C5 Part 2 Dispatch & Monitor screen + what-if endpoint · status DONE (pending review)
+- Module: C5 Part 2 (`app/ui/pages/3_Dispatch.py`, `app/api/main.py`, `app/agent/flow.py`, `app/ui/format.py`, `app/ui/api_client.py`).
+- Endpoints & Flow:
+  - Candidates persistence: `app/agent/flow.py` stores assembled candidates as `agent_trace` node=`candidates` with candidate models dump and evidence ids. `GET /plans/{id}` excludes this blob.
+  - `POST /plans/{id}/whatif`: applies non-destructive scenario modifications to deep copies of candidates (delay_min, price_delta_pct on Plan A mandi, rain_mm_segment on Plan A route, closing_time overrides); recomputes with `build_plan_set`; renders `diff_text` via `render_diff`; never modifies or persists to `plan_versions` or `plans`.
+  - `GET /plans/{id}/events`: returns all watchdog monitoring events for the plan in chronological order.
+  - Added API client helpers in `app/ui/api_client.py`: `post_whatif`, `get_events`, `post_approve`, `post_progress`, `post_watch_tick`, `get_diff`.
+- UI Screen 3 (`3_Dispatch.py`):
+  - Plan picker default from session state or manual text input with validation.
+  - Status badge (awaiting_approval, monitoring, dispatched, replan_pending, rejected, abstained).
+  - Dispatch approval controls: "Approve Dispatch" / "Reject Dispatch".
+  - Progress updates: "Passed Waypoint N", "Delayed +30 min", "Delayed +60 min", "Arrived at Mandi".
+  - Watchdog controls: "Run watchdog tick now" and "Run tick with fresh data" showing triggers, persisted status, and diff.
+  - Re-plan approval panel: appears when status is `replan_pending`, displays diff_text and changed terms table with "Approve Re-plan" and "Keep Current Plan" buttons.
+  - Red-bordered box titled exactly "What-if scenario (user-set) - not observed" with inputs for delay, price change %, rain mm, closing time override; side-by-side comparison of original Plan A vs What-If Plan A; every number tagged `[what_if]`.
+  - Watchdog events timeline in reverse chronological order.
+- Compliance: AGENT §7 wording rules respected (no forbidden words), Ripening remains OFF (SR-1), no direct engine/data imports from UI.
+- Tests: 37 passed in `tests/ui`, `tests/api`, `tests/agent` (added `tests/api/test_whatif.py` and tests in `tests/ui/test_format.py`, `tests/ui/test_screens.py`).

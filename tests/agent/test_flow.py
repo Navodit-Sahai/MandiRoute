@@ -3,16 +3,24 @@ Tests for state-machine flow (C3-lite).
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.agent.flow import run_plan_flow
-from app.contracts import CandidateInputs, Costs, DispatchRequest, LatLon, PriceBand, RouteOption, Waypoint
+from app.contracts import (
+    CandidateInputs,
+    Costs,
+    DispatchRequest,
+    LatLon,
+    PriceBand,
+    RouteOption,
+    Waypoint,
+)
 from app.data.assemble import CandidateAssembly
 from app.db.db import get_conn
 
 
 def FIXTURE_request() -> DispatchRequest:
-    now_utc = datetime(2026, 10, 31, 5, 0, tzinfo=timezone.utc)
+    now_utc = datetime(2026, 10, 31, 5, 0, tzinfo=UTC)
     costs = Costs(
         transport_mode="per_km_per_trip",
         transport_rate=20.0,
@@ -84,7 +92,7 @@ def test_flow_execution_and_trace(monkeypatch):
     monkeypatch.setattr("app.agent.flow.assemble_candidates", lambda req, now: FIXTURE_assembly())
 
     req = FIXTURE_request()
-    now = datetime(2026, 10, 31, 5, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 31, 5, 0, tzinfo=UTC)
     res = run_plan_flow(req, plan_id="test_p1", now=now)
 
     assert res.plan_id == "test_p1"
@@ -99,7 +107,7 @@ def test_flow_execution_and_trace(monkeypatch):
         assert len(rows) <= 12  # Step cap 12
         assert len(rows) >= 5
         steps = [r["node"] for r in rows]
-        assert steps == ["intake", "source_gate", "assemble", "assembly_meta", "decide", "geo", "explain", "done"]
+        assert steps == ["intake", "source_gate", "assemble", "assembly_meta", "candidates", "decide", "geo", "explain", "done"]
         for r in rows:
             assert r["ok"] == 1
         assert len(res.map_points) == 1

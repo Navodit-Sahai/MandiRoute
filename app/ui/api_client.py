@@ -72,3 +72,57 @@ def get_evidence_cached(evidence_id: str) -> dict[str, Any]:
     return _EVIDENCE_CACHE[evidence_id]
 
 
+def post_approve(
+    plan_id: str,
+    *,
+    version: int,
+    decision: str,
+    kind: str,
+) -> dict[str, Any]:
+    url = f"{api_url()}/plans/{plan_id}/approve"
+    resp = requests.post(url, json={"version": version, "decision": decision, "kind": kind}, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def post_progress(plan_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    url = f"{api_url()}/plans/{plan_id}/progress"
+    resp = requests.post(url, json=payload, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def post_watch_tick(plan_id: str, *, fresh: int = 0) -> dict[str, Any]:
+    url = f"{api_url()}/plans/{plan_id}/watch/tick?fresh={fresh}"
+    resp = requests.post(url, timeout=45)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_diff(plan_id: str, *, from_ver: int | None = None, to_ver: int | None = None) -> dict[str, Any]:
+    params = {}
+    if from_ver is not None:
+        params["from"] = from_ver
+    if to_ver is not None:
+        params["to"] = to_ver
+    url = f"{api_url()}/plans/{plan_id}/diff"
+    resp = requests.get(url, params=params, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_events(plan_id: str) -> list[dict[str, Any]]:
+    url = f"{api_url()}/plans/{plan_id}/events"
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def post_whatif(plan_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    url = f"{api_url()}/plans/{plan_id}/whatif"
+    resp = requests.post(url, json=payload, timeout=20)
+    resp.raise_for_status()
+    return resp.json()
+
+
+

@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import datetime
+from typing import Any
 
 from app import guards
 from app.config import get_settings
-from app.contracts import CoverageReport, DispatchRequest, PlanSet, SourceStatus
+from app.contracts import DispatchRequest, PlanSet, SourceStatus
 from app.data.assemble import CandidateAssembly, assemble_candidates
 from app.db.db import get_conn
 from app.engine.plans import build_plan_set
@@ -37,7 +37,7 @@ class FlowResult:
     assembly_warnings: list[str]
     source_status: list[SourceStatus]
     trace_id: str
-    summary: Optional[str] = None
+    summary: str | None = None
     map_points: list[dict[str, Any]] = field(default_factory=list)
     route_paths: dict[str, list[list[float]]] = field(default_factory=dict)
 
@@ -46,7 +46,7 @@ def _record_trace(
     plan_id: str,
     step: int,
     node: str,
-    tool: Optional[str],
+    tool: str | None,
     args_json: str,
     result_summary: str,
     ok: bool,
@@ -155,6 +155,23 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     )
     step_num += 1
 
+    # 3c. Candidates: persist assembled candidates and evidence IDs for what-if
+    cands_blob = json.dumps({
+        "candidates": [c.model_dump() for c in assembly.candidates],
+        "evidence_ids": [e.id for e in assembly.evidence],
+    })
+    _record_trace(
+        plan_id=plan_id,
+        step=step_num,
+        node="candidates",
+        tool=None,
+        args_json=json.dumps({"evidence_ids": [e.id for e in assembly.evidence]}),
+        result_summary=cands_blob,
+        ok=True,
+        ts=ts_now,
+    )
+    step_num += 1
+
     # 4. Decide: Build plan set using decision engine (ONE call)
     decide_args = json.dumps({"candidate_count": len(assembly.candidates), "risk_mode": req.risk_mode})
     planset: PlanSet = build_plan_set(
@@ -211,7 +228,7 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     step_num += 1
 
     # 6. Explain: Render summary and check numbers
-    summary: Optional[str] = None
+    summary: str | None = None
     explain_summary = "Explainer not installed, summary=None"
     try:
         from app.contracts.evidence import Evidence

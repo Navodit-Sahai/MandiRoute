@@ -7,7 +7,7 @@ Pure functions, tested independently of Streamlit.
 from __future__ import annotations
 
 import math
-from typing import Any, Optional
+from typing import Any
 
 FORBIDDEN_PHRASES: tuple[str, ...] = (
     "real-time prices",
@@ -31,9 +31,12 @@ ROBUSTNESS_TEMPLATE = "A is best in {k} of 9 tested scenarios"
 PRICE_REPORTED_TEMPLATE = "Price reported (record date: {date})"
 MANDI_SOURCE_NOTE = "daily records, not real-time"
 UNAVAILABLE = "unavailable"
+WHAT_IF_TITLE = "What-if scenario (user-set) - not observed"
+WHAT_IF_TAG = "[what_if]"
 
 
-def format_inr(val: float | int | None) -> str:
+
+def format_inr(val: float | None) -> str:
     """
     Format a rupee number using Indian numbering system:
     e.g. 51200 -> '₹51,200', 150000 -> '₹1,50,000', -5000 -> '-₹5,000'.
@@ -125,6 +128,22 @@ def scan_forbidden_words(text: str) -> list[str]:
         if phrase in lowered:
             found.append(phrase)
     return found
+
+
+def format_what_if_tag() -> str:
+    """Return the required what-if tag."""
+    return WHAT_IF_TAG
+
+
+def render_red_box_html(title: str, content: str) -> str:
+    """Format the red-bordered what-if scenario container per AGENT.md §7."""
+    return (
+        f'<div style="border: 2px solid #d32f2f; border-radius: 8px; padding: 16px; margin: 16px 0; background-color: #fff8f8;">'
+        f'<h4 style="color: #d32f2f; margin-top: 0; margin-bottom: 8px;">{title}</h4>'
+        f'{content}'
+        f'</div>'
+    )
+
 
 
 

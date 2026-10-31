@@ -3,12 +3,9 @@ Unit tests for UI formatting and wording helpers (Stream C).
 """
 from __future__ import annotations
 
-import pytest
-
 from app.ui.format import (
     COMMIT_APPROX_TEMPLATE,
     DELAY_STRESS_LABEL,
-    FORBIDDEN_PHRASES,
     MANDI_SOURCE_NOTE,
     NO_FLIP_LABEL,
     PRICE_REPORTED_TEMPLATE,
@@ -95,5 +92,24 @@ def test_format_location_precision():
     assert format_location_precision("district_centroid") == "district centroid (approximate)"
     assert format_location_precision(None) == "unknown"
     assert format_location_precision("") == "unknown"
+
+
+def test_what_if_formatting_and_constants():
+    from app.ui.format import (
+        WHAT_IF_TAG,
+        WHAT_IF_TITLE,
+        format_what_if_tag,
+        render_red_box_html,
+    )
+
+    assert WHAT_IF_TITLE == "What-if scenario (user-set) - not observed"
+    assert WHAT_IF_TAG == "[what_if]"
+    assert format_what_if_tag() == "[what_if]"
+
+    html = render_red_box_html(WHAT_IF_TITLE, "<p>content</p>")
+    assert "border: 2px solid #d32f2f" in html
+    assert WHAT_IF_TITLE in html
+    assert "<p>content</p>" in html
+
 
 
