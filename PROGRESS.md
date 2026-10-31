@@ -249,3 +249,10 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Tests run: 11 passed in `tests/api` & `tests/agent`; 253 passed full suite (`pytest -q --tb=short`).
 - Live Verification: Gate G2 passed. Live `POST /plan` with Pune, Maharashtra origin returned status `awaiting_approval`, coverage `ACTIONABLE_WITH_CAVEATS`, and 3 plans (Plan A: APMC Panvel, Plan B: Pune(Pimpri), Plan C: APMC Panvel +2h) in 39.7s.
 - Blockers: None. Next module: C2 (Telegram integration) or C5 (Streamlit UI).
+
+### 2026-11-01 — Stream B — plain-language layer (additive, app/explain)
+- Files: `app/explain/templates.py` (+`plain_grade(grade, lang="hi")`, +`price_source_line(price_band, lang="hi", *, market)`), `app/explain/__init__.py` (exports), `tests/explain/test_plain.py` (new).
+- Tests: `pytest tests/explain -q` → 16 passed. `ruff check app/explain tests/explain` clean.
+- Assumptions: PriceBand has no market field → `market=` is a required keyword the caller passes (MandiCandidate name); no contract change. Dropped "aaj" from the Hindi line: record_date may not be today (would overstate freshness, AGENT §7). Unknown grade/lang → ValueError.
+- For Stream C: `from app.explain import plain_grade, price_source_line`; show `plain_grade(ps.grade, lang)` next to the grade; `price_source_line(band, lang, market=cand.name)` under each price.
+- Blockers: none. Next: C wires into UI.
