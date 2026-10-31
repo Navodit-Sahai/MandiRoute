@@ -15,3 +15,5 @@ madienv/
 __pycache__/
 
 
+
+*.zip
