@@ -351,3 +351,18 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Verification:
   - All 47 Stream C tests passed (`pytest tests/ui tests/api tests/agent`).
   - Verified live on Pune plan `23d2af56`: zero `[untagged]` values remain anywhere on the Compare screen.
+
+
+### 2026-11-01 · Stream C · session-simplify-ui · Simplify Plan & Compare pages for non-technical users · status DONE (pending review)
+- Module: UI simplification for non-technical users (app/ui/pages/1_Plan.py, app/ui/pages/2_Compare.py, app/ui/format.py, tests/ui/test_format.py).
+- Changes:
+  1. Language selector: Added Hindi / English toggle at top of Plan and Compare pages, persisted in st.session_state['lang'].
+  2. Plan page: Default view shows only 3 required inputs (Quantity in qtl, Origin location, Departure date+time). Advanced parameters (transport rate/mode, handling & market deductions, clear deductions, risk mode, loading time, max distance) placed inside collapsed expander 'Advanced settings (for detailed users)'. Source Status strip and read-only assumptions panel kept below expander.
+  3. Compare page: Added plain-language summary box per plan above detailed cards using app.explain.plain_grade, price_source_line, and translate_top_caveat (translating top coverage caveats such as closing time unknown to Hindi: 'mandi band hone ka time pata nahi, nikalne se pehle phone kar lein' and English). Preserved all existing detailed cards, scenario results, flip boundaries, commitment points, and evidence ledger inside collapsed expander 'Detailed view (for technical users / judges)'.
+  4. Helpers & Tests: Added translate_top_caveat and format_plain_summary in app/ui/format.py; added unit tests in tests/ui/test_format.py covering translations and forbidden words check.
+- Tests & Verification:
+  - 16 passed in tests/ui.
+  - 65 passed across tests/ui, tests/api, tests/agent, tests/explain.
+  - 346 passed across full repo test suite (pytest -q --tb=short).
+  - ruff check app/ui tests/ui clean.
+- Assumptions & Blockers: None. Next module: Demo walkthrough / Final user review.

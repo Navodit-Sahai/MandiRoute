@@ -29,7 +29,7 @@ try:
     if banner:
         st.warning(f"⚠️ {banner}")
     st.sidebar.success(f"Backend API connected ({mode} mode)")
-except Exception as e:
+except Exception:
     st.sidebar.error("Backend API not reachable. Start FastAPI server with:\n`python -m uvicorn app.api.main:app --port 8000`")
     st.warning("⚠️ Could not connect to MandiGuard backend API at http://localhost:8000. Please start the API server.")
 
