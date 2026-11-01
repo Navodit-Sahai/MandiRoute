@@ -427,3 +427,17 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - ruff check clean on edited folders.
   - Local verification with non-default MG_API_URL and MG_CORS_ORIGINS passed: GET /health returned 200 with CORS headers, GET /sources/health probed 6 sources ok.
 - Assumptions & Blockers: None.
+
+### 2026-11-01 · Integration Session · Merge stream-c and stream-b into main LangGraph graph · status DONE
+- Scope: Resolved merge conflicts between origin/main (LangGraph workflow) and stream-c (commodity generalization, plain-flow fallback, Telegram bot, watchdog, Render deployment files), followed by merging stream-b.
+- Changes:
+  1. Resolved 7-file conflict in integrate branch: PROGRESS.md, app/agent/flow.py, app/api/main.py, app/ui/api_client.py, app/ui/pages/1_Plan.py, app/ui/pages/2_Compare.py, tests/agent/test_flow.py.
+  2. Preserved LangGraph workflow as default; added clean fallback to plain orchestrator when MG_AGENT=plain via app/agent/flow_plain.py.
+  3. Ensured trace contract adherence across nodes: geo, explain, candidates, assembly_meta, done.
+  4. Preserved Telegram handler, background watchdog, and watchdog HTTP endpoints under thread-safe plan locks.
+  5. Moved legacy 3_Dispatch.py to app/ui/legacy/3_Dispatch.py, keeping teammate's 3_Dispatch_and_Monitor.py as primary Dispatch & Active Monitoring page with dynamic replan approval wired to latest_version.
+  6. Merged stream-b cleanly; retained integrate version of tests/agent/test_flow.py.
+- Tests & Verification:
+  - Default LangGraph suite: 375 passed, 1 skipped, 0 failed.
+  - MG_AGENT=plain fallback suite: 375 passed, 1 skipped, 0 failed.
+  - V1–V10 checks fully verified.
