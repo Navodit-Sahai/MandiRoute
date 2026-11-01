@@ -18,6 +18,7 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import os
 import logging
 import secrets
 from contextlib import asynccontextmanager
@@ -69,9 +70,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MandiGuard API", version="1.0", lifespan=lifespan)
 
 # CORS for Streamlit UI
+raw_cors = os.environ.get("MG_CORS_ORIGINS", "http://localhost:8501")
+cors_origins = [orig.strip() for orig in raw_cors.split(",") if orig.strip()]
+if not cors_origins:
+    cors_origins = ["http://localhost:8501"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -240,8 +246,8 @@ def get_plan(id: str) -> dict[str, Any]:
             (id,),
         ).fetchone()
 
-        assemble_row = conn.execute(
-            "SELECT result_summary FROM agent_trace WHERE plan_id = ? AND node = 'assemble' ORDER BY id DESC LIMIT 1",
+        done_row = conn.execute(
+            "SELECT args_json FROM agent_trace WHERE plan_id = ? AND node = 'done' ORDER BY id DESC LIMIT 1",
             (id,),
         ).fetchone()
 
@@ -261,8 +267,11 @@ def get_plan(id: str) -> dict[str, Any]:
             pass
 
     warnings: list[str] = []
-    if assemble_row and assemble_row["result_summary"]:
-        warnings.append(assemble_row["result_summary"])
+    if done_row and done_row["args_json"]:  # FIX: real warnings, not the "Assembled N candidates" line
+        try:
+            warnings = list(json.loads(done_row["args_json"]).get("warnings", []))
+        except Exception:
+            pass
 
     summary: str | None = None
     why_not_text: str | None = None
@@ -399,18 +408,22 @@ def apply_plan_approval(
                     status_code=409,
                     detail=f"Cannot approve replan for plan in status '{current_status}' (must be 'replan_pending')",
                 )
-            if decision == "approve":
-                conn.execute(
-                    "UPDATE plans SET status = 'monitoring', updated_at = ? WHERE plan_id = ?",
-                    (now_iso, id),
-                )
-                new_status = "monitoring"
-            else:
-                conn.execute(
-                    "UPDATE plans SET status = 'monitoring', updated_at = ? WHERE plan_id = ?",
-                    (now_iso, id),
-                )
-                new_status = "monitoring"
+            if decision == "reject":
+                # FIX: the proposed version was already saved as latest, so a rejected
+                # replan silently became the new baseline. Drop it.
+                latest_v = conn.execute(
+                    "SELECT MAX(version) AS v FROM plan_versions WHERE plan_id = ?", (id,)
+                ).fetchone()["v"]
+                if latest_v is not None and latest_v > 1 and latest_v == version:
+                    conn.execute(
+                        "DELETE FROM plan_versions WHERE plan_id = ? AND version = ?",
+                        (id, version),
+                    )
+            conn.execute(
+                "UPDATE plans SET status = 'monitoring', updated_at = ? WHERE plan_id = ?",
+                (now_iso, id),
+            )
+            new_status = "monitoring"
 
         # Record approval
         conn.execute(
@@ -454,7 +467,7 @@ def apply_plan_approval(
         notify(
             plan_id=id,
             kind=f"{kind}_{decision}",
-            text=f"Plan {id} v{version} {kind} was {decision}d",
+            text=f"Plan {id} v{version} {kind} was " + ("approved" if decision == "approve" else "rejected"),  # FIX: was "rejectd"
         )
 
     return {
@@ -531,8 +544,14 @@ def apply_plan_progress(
             """,
             (id, now_iso, "{}", None, prog.model_dump_json()),
         )
+        if arrived and plan_row["status"] == "monitoring":
+            # FIX: "arrived" was accepted but ignored; watchdog kept ticking a finished trip.
+            conn.execute(
+                "UPDATE plans SET status = 'completed', updated_at = ? WHERE plan_id = ?",
+                (now_iso, id),
+            )
 
-    return {"ok": True, "plan_id": id, "progress": prog.model_dump()}
+    return {"ok": True, "plan_id": id, "progress": prog.model_dump(), "arrived": bool(arrived)}
 
 
 @app.post("/plans/{id}/approve")

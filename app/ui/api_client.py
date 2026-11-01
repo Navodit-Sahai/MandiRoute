@@ -13,7 +13,10 @@ import requests
 
 
 def api_url() -> str:
-    return os.environ.get("MG_API_URL", "http://localhost:8000").rstrip("/")
+    url = os.environ.get("MG_API_URL", "http://localhost:8000").rstrip("/")
+    if url and not url.startswith("http://") and not url.startswith("https://"):
+        url = f"https://{url}"
+    return url
 
 
 def get_health() -> dict[str, Any]:

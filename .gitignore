@@ -1,4 +1,7 @@
 .env
+*.db
+*.db-wal
+*.db-shm
 data/*.db
 data/*.db-wal
 data/*.db-shm
@@ -12,8 +15,4 @@ __pycache__/
 .ruff_cache/
 .venv
 madienv/
-__pycache__/
-
-
-
 *.zip

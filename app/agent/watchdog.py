@@ -21,7 +21,7 @@ from typing import Any, Optional
 from fastapi import HTTPException
 
 from app.config import get_settings
-from app.contracts import DispatchProgress, DispatchRequest, Evidence, PlanDiff, PlanSet
+from app.contracts import DispatchProgress, DispatchRequest, Evidence, PlanSet
 from app.data.assemble import refresh_for_monitoring
 from app.db.db import get_conn, get_evidence
 from app.engine import WatchState, evaluate_triggers_and_recompute
@@ -305,7 +305,8 @@ def _watchdog_loop(stop_event: threading.Event) -> None:
                 p_lock = get_plan_lock(p_id)
                 if p_lock.acquire(blocking=False):
                     try:
-                        tick_plan(p_id)
+                        # FIX: tick_plan() re-acquires the same non-reentrant Lock -> deadlock.
+                        _tick_plan_unlocked(p_id)
                     except Exception as err:
                         logger.exception("Watchdog error ticking plan %s: %s", p_id, err)
                     finally:

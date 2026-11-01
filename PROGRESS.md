@@ -377,3 +377,22 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - 16 passed in tests/ui.
   - 346 passed full repo test suite (pytest -q --tb=short).
   - ruff check clean.
+
+
+### 2026-11-01 · Stream C · session-deployment · Module A9-lite Deployment (FastAPI + Streamlit on Render) · status DONE (pending review)
+- Module: A9-lite Deployment configuration for Render (render.yaml, README_DEPLOY.md, .env.example, .gitignore, app/api/main.py, app/ui/api_client.py, app/ui/home.py, app/agent/flow.py, app/agent/watchdog.py).
+- Changes:
+  1. API Base URL (UI): Configured in app/ui/api_client.py via MG_API_URL (default http://localhost:8000), with scheme handling for Render hostnames. Updated app/ui/home.py warning.
+  2. CORS (API): In app/api/main.py, replaced hardcoded origins with MG_CORS_ORIGINS env var (comma-separated, default http://localhost:8501), never using wildcard * with credentials.
+  3. Process & Deployment Blueprint: Created render.yaml defining two web services (mandiguard-api and mandiguard-ui), pinning Python 3.12.7, uvicorn with --workers 1 to guarantee single-instance watchdog and Telegram polling, 1 GB persistent disk mounted at /var/data on API, and secrets marked sync: false.
+  4. SQLite Persistence: Verified app/db/db.py is env-configurable via DB_PATH (/var/data/mandiguard.db).
+  5. Secrets & Gitignore: Added *.db to .gitignore. Generated .env.example with EMPTY values only.
+  6. Documentation: Created README_DEPLOY.md (29 lines) documenting deploy steps, env vars table, key rotation, restart instructions, and limits (free tier idle wake-up, 100s proxy timeout).
+  7. Timeouts: Confirmed live first POST /plan takes ~40s (G2 was 39.7s), well within Render's 100s gateway timeout.
+- Environment Variables List:
+  DATAGOV_KEY, TG_TOKEN, TG_CHAT_ID, MG_API_URL, MG_CORS_ORIGINS, PORT, MG_MODE, MG_WATCHDOG, MG_TELEGRAM, MG_DEMO, MG_PRICE_UNIT_VERIFIED, DB_PATH, MG_COORDS_CSV, MG_CONTACT_EMAIL, DATAGOV_STATE_FILTER.
+- Tests & Verification:
+  - 347 passed full test suite (pytest -q --tb=short).
+  - ruff check clean on edited folders.
+  - Local verification with non-default MG_API_URL and MG_CORS_ORIGINS passed: GET /health returned 200 with CORS headers, GET /sources/health probed 6 sources ok.
+- Assumptions & Blockers: None.

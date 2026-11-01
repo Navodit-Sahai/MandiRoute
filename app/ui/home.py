@@ -31,7 +31,7 @@ try:
     st.sidebar.success(f"Backend API connected ({mode} mode)")
 except Exception:
     st.sidebar.error("Backend API not reachable. Start FastAPI server with:\n`python -m uvicorn app.api.main:app --port 8000`")
-    st.warning("⚠️ Could not connect to MandiGuard backend API at http://localhost:8000. Please start the API server.")
+    st.warning(f"⚠️ Could not connect to MandiGuard backend API at {api_client.api_url()}. Please start the API server.")
 
 st.markdown("""
 ### Welcome to MandiGuard

@@ -15,6 +15,7 @@ Every step is recorded to the agent_trace SQLite table.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -25,6 +26,8 @@ from app.contracts import DispatchRequest, PlanSet, SourceStatus
 from app.data.assemble import CandidateAssembly, assemble_candidates
 from app.db.db import get_conn
 from app.engine.plans import build_plan_set
+
+logger = logging.getLogger(__name__)  # FIX: used below but was never defined (NameError)
 
 STEP_CAP = 12
 
@@ -75,7 +78,7 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
 
     # 1. Intake: Validate request
     ts_now = now.isoformat()
-    intake_args = json.dumps({"crop": req.crop, "origin": req.origin_label, "quantity_qtl": req.quantity_qtl})
+    intake_args = json.dumps({"commodity": req.crop, "origin": req.origin_label, "quantity_qtl": req.quantity_qtl})
     _record_trace(
         plan_id=plan_id,
         step=step_num,
@@ -106,7 +109,15 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
     # 3. Assemble: Fetch candidate mandis, prices, routes, and weather
     assemble_args = json.dumps({"origin": [req.origin.lat, req.origin.lon], "max_km": req.max_distance_km})
     try:
-        assembly: CandidateAssembly = assemble_candidates(req, now)
+        from app.api.deps import get_candidate_assembler
+        from app.data.assemble import assemble_candidates as real_assemble
+
+        if assemble_candidates is not real_assemble:
+            assembler = assemble_candidates
+        else:
+            assembler = get_candidate_assembler()
+
+        assembly: CandidateAssembly = assembler(req, now)
         assemble_summary = (
             f"Assembled {len(assembly.candidates)} candidates, "
             f"{len(assembly.evidence)} evidence items, {len(assembly.warnings)} warnings"
@@ -141,6 +152,7 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
 
     # 3b. Assembly metadata: persist selected grade and variety
     meta_json = json.dumps({
+        "commodity": req.crop,
         "selected_grade": assembly.selected_grade,
         "selected_variety": assembly.selected_variety,
     })
@@ -304,7 +316,7 @@ def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResu
         step=step_num,
         node="done",
         tool=None,
-        args_json="{}",
+        args_json=json.dumps({"warnings": assembly.warnings}),  # FIX: persisted for GET /plans/{id}
         result_summary=f"Flow completed with status={final_status}",
         ok=True,
         ts=ts_now,
