@@ -366,3 +366,14 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - 346 passed across full repo test suite (pytest -q --tb=short).
   - ruff check app/ui tests/ui clean.
 - Assumptions & Blockers: None. Next module: Demo walkthrough / Final user review.
+
+
+### 2026-11-01 · Stream C · session-generalize-commodity · Generalize crop support beyond Tomato · status DONE (pending review)
+- Changes:
+  1. Contracts: Changed DispatchRequest.crop from Literal['Tomato'] = 'Tomato' to str = 'Tomato' in app/contracts/inputs.py, allowing any commodity (e.g. Onion, Potato, Green Chilli) while preserving Tomato default.
+  2. Plan UI (1_Plan.py): Added Commodity / फसल selector (Tomato, Onion, Potato, Green Chilli, Other) to the dispatch form, dynamically labeling quantity and passing the selected commodity in the request payload.
+  3. Home UI (home.py): Updated landing headings and workflow descriptions to general agricultural commodity dispatch.
+- Tests & Verification:
+  - 16 passed in tests/ui.
+  - 346 passed full repo test suite (pytest -q --tb=short).
+  - ruff check clean.

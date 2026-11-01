@@ -44,7 +44,7 @@ with col_lang:
 lang = st.session_state["lang"]
 
 with col_title:
-    title_text = "Plan Tomato Dispatch" if lang == "en" else "टमाटर डिस्पैच योजना (Plan Tomato Dispatch)"
+    title_text = "Plan Commodity Dispatch" if lang == "en" else "फसल डिस्पैच योजना (Plan Commodity Dispatch)"
     st.title(title_text)
 
 # 1. Health banner
@@ -68,9 +68,26 @@ for key in deduction_keys:
         st.session_state[key] = (key != "use_other")
 
 with st.form("dispatch_form"):
+    # Commodity selection
+    col_c1, col_c2 = st.columns([1, 1])
+    with col_c1:
+        commodity_choice = st.selectbox(
+            "Commodity / फसल",
+            options=["Tomato", "Onion", "Potato", "Green Chilli", "Other"],
+            index=0,
+            help="Select agricultural commodity",
+        )
+    with col_c2:
+        if commodity_choice == "Other":
+            commodity_name = st.text_input("Enter commodity name / फसल का नाम दर्ज करें", value="Tomato").strip() or "Tomato"
+        else:
+            commodity_name = commodity_choice
+
     # Input 1: Quantity
     quantity_qtl = st.number_input(
-        "1. Quantity (Quintals only, 1 qtl = 100 kg)" if lang == "en" else "1. मात्रा / Quantity (क्विंटल में, 1 qtl = 100 kg)",
+        f"1. Quantity of {commodity_name} (Quintals only, 1 qtl = 100 kg)"
+        if lang == "en"
+        else f"1. मात्रा / Quantity ({commodity_name}, क्विंटल में, 1 qtl = 100 kg)",
         min_value=0.1,
         value=40.0,
         step=1.0,
@@ -160,7 +177,7 @@ if submitted:
     apply_hld = use_hold and not clear_all_deductions
 
     payload: dict[str, Any] = {
-        "crop": "Tomato",
+        "crop": commodity_name,
         "quantity_qtl": float(quantity_qtl),
         "origin": {"lat": float(origin_lat), "lon": float(origin_lon)},
         "origin_label": origin_label,

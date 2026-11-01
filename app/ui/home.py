@@ -12,14 +12,14 @@ import streamlit as st
 from app.ui import api_client
 
 st.set_page_config(
-    page_title="MandiGuard — Tomato Dispatch Decision Support",
+    page_title="MandiGuard — Commodity Dispatch Decision Support",
     page_icon="🍅",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 st.title("🍅 MandiGuard")
-st.subheader("Tomato Dispatch Decision Support (India)")
+st.subheader("Commodity Dispatch Decision Support (India)")
 
 # Health check & mode banner
 try:
@@ -38,7 +38,7 @@ st.markdown("""
 MandiGuard evaluates multiple mandi destinations across price scenarios, transit delays, market closing windows, and rain exposure.
 
 #### Workflow:
-1. **Plan (`1_Plan`)**: Enter dispatch origin, tomato quantity (quintals), transport costs, and departure timing. View source health and system assumptions.
+1. **Plan (`1_Plan`)**: Enter dispatch origin, commodity quantity (quintals), transport costs, and departure timing. View source health and system assumptions.
 2. **Compare (`2_Compare`)**: Review the route map, candidate mandis, and Plans A, B, and C with full scenario breakdowns, flip boundaries, and evidence ledger links.
 3. **Dispatch & Monitor**: Available post-dispatch for live tracking and trigger evaluation.
 
