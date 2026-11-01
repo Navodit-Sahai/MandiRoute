@@ -14,7 +14,7 @@ from app.config import Settings
 from app.contracts import CandidateInputs, PlanOption, RouteOption, ScenarioResult
 from app.contracts.inputs import DispatchRequest
 from app.engine.netvalue import net_value
-from app.engine.units import delayed_arrival, hours_to_seconds, lowest_k_count, mean_of_lowest, window_status
+from app.engine.units import delayed_arrival, hours_to_seconds, lowest_k_count, mean_of_lowest, to_local, window_status
 
 PRICE_LEVELS: tuple[Literal["low", "typical", "high"], ...] = ("low", "typical", "high")
 DELAY_LEVELS: tuple[Literal["none", "moderate", "severe"], ...] = ("none", "moderate", "severe")
@@ -40,6 +40,8 @@ def evaluate_option(
         raise ValueError(f"candidate '{cand.mandi_id}' has no price band")
     if wait_hours_after < 0:
         raise ValueError("wait_hours_after cannot be negative")
+    # Same instant -> same option_id/depart_iso/arrival_iso, always in local (IST) clock time
+    depart = to_local(depart, cfg.timezone_name)
 
     # Closing time from candidate or request mapping
     closing_hhmm = cand.latest_arrival_local or req.mandi_latest_arrival.get(cand.mandi_id)

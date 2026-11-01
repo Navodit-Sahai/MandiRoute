@@ -41,8 +41,8 @@ def validate_request_tool(req: DispatchRequest) -> dict[str, Any]:
         res = {"valid": False, "error": f"Quantity must be positive quintals, got {req.quantity_qtl}"}
     elif req.loading_time.tzinfo is None or req.preferred_departure.tzinfo is None:
         res = {"valid": False, "error": "Datetimes must be timezone-aware"}
-    elif req.crop != "Tomato":
-        res = {"valid": False, "error": f"MVP supports crop 'Tomato' only, got '{req.crop}'"}
+    elif not req.crop:
+        res = {"valid": False, "error": "Crop must be specified"}
     else:
         res = {
             "valid": True,

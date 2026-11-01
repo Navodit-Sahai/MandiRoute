@@ -204,10 +204,11 @@ if status == "replan_pending" and diff:
     st.markdown("#### Human Approval Decision")
     st.caption("Autonomous rerouting is strictly prohibited (NN-11). Explicit human approval is required.")
     appr_col1, appr_col2, _ = st.columns([2, 2, 4])
+    replan_version = plan_data.get("latest_version") or ((plan_data.get("version") or 1) + 1)
     with appr_col1:
         if st.button("✅ Approve Plan Revision", use_container_width=True, type="primary"):
             try:
-                api_client.post_approval(selected_plan_id, kind="replan", decision="approve")
+                api_client.post_approval(selected_plan_id, kind="replan", decision="approve", version=replan_version)
                 st.success("Plan revision approved! Now monitoring revised route.")
                 st.rerun()
             except Exception as e:
@@ -215,7 +216,7 @@ if status == "replan_pending" and diff:
     with appr_col2:
         if st.button("❌ Reject Revision (Keep Current)", use_container_width=True):
             try:
-                api_client.post_approval(selected_plan_id, kind="replan", decision="reject")
+                api_client.post_approval(selected_plan_id, kind="replan", decision="reject", version=replan_version)
                 st.info("Revision rejected. Retaining current plan.")
                 st.rerun()
             except Exception as e:

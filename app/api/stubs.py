@@ -62,7 +62,7 @@ def _assembly(req: DispatchRequest, now: datetime):
         candidates=_candidates(),
         evidence=[],
         source_status=[],
-        warnings=[_TAG + "NOT LIVE mode assembly"],
+        warnings=[_TAG + f"NOT LIVE mode assembly (commodity={req.crop})"],
         selected_variety="Other",
         selected_grade="FAQ",
     )

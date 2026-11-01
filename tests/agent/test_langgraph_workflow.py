@@ -162,7 +162,7 @@ def test_langgraph_workflow_abstain_path_no_data(monkeypatch):
     assert final_state["planset"] is not None
     assert len(final_state["planset"].plans) == 0
     assert final_state["planset"].coverage.grade == "ABSTAIN"
-    assert "no candidate mandi has a price record" in final_state["planset"].coverage.reasons
+    assert "no candidate mandi has a usable price record" in final_state["planset"].coverage.reasons
 
 
 def test_langgraph_intake_validation_abort():
