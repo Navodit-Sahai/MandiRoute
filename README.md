@@ -226,11 +226,7 @@ tests/             engine, data, agent, API and UI tests
 
 </details>
 
----
-
-## 👥 Team
-
-[Add team names and roles here]
+--
 
 <div align="center">
 
