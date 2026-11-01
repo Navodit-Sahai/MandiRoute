@@ -281,3 +281,19 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   5. Compare page: collapsed "Data notes" box for warnings; location precision shown for all candidates ("market" or "district centroid (approximate)").
 - Tests: 22 passed in `tests/ui` and `tests/api`. Live browser/curl verification for Pune returned status `awaiting_approval` with 8 candidate mandis.
 
+
+
+### 2026-11-01 · Stream C · session-langgraph-monitoring · LangGraph Continuous Real-Time Monitoring & Dynamic Plan Revision · status DONE (pending review)
+- Module: LangGraph Agentic Monitoring & Dynamic Plan Revision (C3/C4/C5 Screen 3).
+- Files modified / created:
+  - `app/agent/graph/state.py`: Extended `PlanWorkflowState` with typed monitoring fields (`progress`, `watch_state`, `trigger_decision`, `diff`, `diff_summary`, `history`, `active_version`).
+  - `app/agent/graph/tools.py`: Added discrete pure tools: `refresh_monitoring_data_tool`, `evaluate_change_and_triggers_tool`, `render_diff_summary_tool`, `load_plan_from_db_tool`, `save_plan_version_tool`, `save_watch_state_tool`.
+  - `app/agent/graph/agents.py`: Added autonomous monitoring agents: `monitor_ingress_agent`, `data_refresh_agent`, `change_detection_agent`, `replanning_agent`, `replan_explainer_agent`, `retain_plan_agent`.
+  - `app/agent/graph/workflow.py`: Unified compiled `StateGraph` supporting initial planning and event-driven monitoring ticks with `InMemorySaver` checkpointing, dynamic conditional routing based on change detection, and `execute_monitoring_tick`.
+  - `app/api/main.py`: Added REST endpoints: `POST /plans/{id}/dispatch`, `POST /plans/{id}/progress`, `POST /plans/{id}/watch/tick`, `POST /plans/{id}/approve`, `GET /plans`, `GET /plans/{id}/diff`, `GET /plans/{id}/watch`.
+  - `app/ui/api_client.py`: Added API client methods for dispatch, progress, watch tick, approval, diff, watch status, and plan listing.
+  - `app/ui/pages/3_Dispatch_and_Monitor.py`: Screen 3 Streamlit UI with plan selector, dispatch truck button, delay check-in controls, trigger status cards (T1-T5, hysteresis, cooldown), proposed replan diff view with before/after comparisons and primary reason, human approval buttons (NN-11), plan version history expanders, and agent execution trace table.
+  - `tests/agent/test_monitoring_lifecycle.py`: Full end-to-end test suite testing initial plan synthesis -> dispatch -> nominal tick (no change) -> delay spike tick (hysteresis check 1/2) -> persisted delay tick (replan triggered, v2 created, diff generated) -> human approval -> resumed monitoring on revised plan -> missing data handling -> cooldown enforcement -> FastAPI endpoints integration.
+- Tests run: 320 passed (312 passed, 8 skipped offline live-api tests).
+- Non-negotiables upheld: NN-1 (no fake/fallback data), NN-8 (deterministic engine math only; no LLM math), NN-10 (unknown != zero; missing data causes abstain/retain without failure), NN-11 (explicit human approval required for dispatch and plan revisions). Ripening disabled per SR-1/CR-5.
+- Next module: C2 (Telegram notification integration) or end-to-end rehearsals (G3/G5).
