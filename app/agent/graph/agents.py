@@ -211,12 +211,13 @@ def explainer_agent(state: PlanWorkflowState) -> PlanWorkflowState:
     # 2. Finalize status
     is_abstained = planset.coverage.grade == "ABSTAIN" or len(planset.plans) == 0
     final_status = "abstained" if is_abstained else "awaiting_approval"
+    warnings = list(assembly.warnings) if assembly else state.get("warnings", [])
     record_trace(
         plan_id,
         step_num,
         "done",
         None,
-        "{}",
+        json.dumps({"warnings": warnings}),
         f"Flow completed with status={final_status}",
         True,
         ts_now,

@@ -1,1 +1,11 @@
 mandi_id,market,district,state,lat,lon,precision,verified,source,note
+maharashtra__pune__pune-manjri,Pune(Manjri),Pune,Maharashtra,18.5007126,73.9687157,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__pune__pune-moshi,Pune(Moshi),Pune,Maharashtra,18.6523154,73.8442032,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__pune__khed-chakan,Khed(Chakan),Pune,Maharashtra,18.7623111,73.8625448,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__pune__pune-pimpri,Pune(Pimpri),Pune,Maharashtra,18.6231854,73.8019932,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__nashik__apmc-ghoti,APMC Ghoti,Nashik,Maharashtra,19.7167761,73.6244742,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__nagpur__apmc-kalmeshwar,APMC Kalmeshwar,Nagpur,Maharashtra,21.2374393,78.9081689,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__nagpur__apmc-hingna,APMC Hingna,Nagpur,Maharashtra,20.9916033,78.8732421,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__nagpur__apmc-ramtek,APMC Ramtek,Nagpur,Maharashtra,21.3935847,79.2999141,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__nagpur__apmc-nagpur,APMC Nagpur,Nagpur,Maharashtra,21.164495,79.147645,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__mumbai__apmc-mumbai,APMC Mumbai,Mumbai,Maharashtra,19.07695797,73.00706632,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName

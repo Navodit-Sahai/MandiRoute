@@ -2,7 +2,8 @@
 Screen 1 - Plan (Stream C).
 
 Form for DispatchRequest inputs, source-health status strip, read-only assumptions panel,
-and plan submission with closing-time re-planning.
+and plan submission with closing-time re-planning. Simplified for non-technical users
+with advanced parameters placed in a collapsed expander.
 """
 from __future__ import annotations
 
@@ -15,10 +16,8 @@ for parent in Path(__file__).resolve().parents:
         if str(parent) not in sys.path:
             sys.path.insert(0, str(parent))
         break
-
-
-from datetime import datetime, time
 import zoneinfo
+from datetime import datetime, time
 from typing import Any
 
 import streamlit as st
@@ -34,7 +33,28 @@ IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
 st.set_page_config(page_title="Plan Dispatch — MandiGuard", page_icon="🍅", layout="wide")
 
-st.title("Plan Tomato Dispatch")
+# Language toggle at top
+if "lang" not in st.session_state:
+    st.session_state["lang"] = "en"
+
+col_title, col_lang = st.columns([7, 3])
+with col_lang:
+    lang_choice = st.radio(
+        "Language / भाषा",
+        options=["English", "हिंदी"],
+        index=0 if st.session_state["lang"] == "en" else 1,
+        horizontal=True,
+    )
+    new_lang = "hi" if lang_choice == "हिंदी" else "en"
+    if new_lang != st.session_state["lang"]:
+        st.session_state["lang"] = new_lang
+        st.rerun()
+
+lang = st.session_state["lang"]
+
+with col_title:
+    title_text = "Plan Commodity Dispatch" if lang == "en" else "फसल डिस्पैच योजना (Plan Commodity Dispatch)"
+    st.title(title_text)
 
 # 1. Health banner
 try:
@@ -45,131 +65,128 @@ try:
 except Exception as e:
     st.error(f"Cannot connect to API backend: {e}")
 
-# 2. Source-health strip
-st.markdown("### Source Status")
-try:
-    sources = api_client.get_sources_health()
-    cols = st.columns(len(sources) if sources else 1)
-    for i, src in enumerate(sources):
-        with cols[i]:
-            src_name = src.get("name") or src.get("source") or "unknown"
-            ok = src.get("ok", False)
-            status_str = "🟢 OK" if ok else "🔴 Failed"
-            kind_tag = format_kind_tag(src.get("kind"))
-            time_str = format_source_time(src.get("as_of"), src.get("fetched_at"))
-            note_text = src.get("note")
+# 2. Dispatch Request Form - Simplified: only 3 required inputs by default
+st.subheader("Dispatch Details" if lang == "en" else "डिस्पैच विवरण (Dispatch Details)")
 
-            is_mandi = "agmarknet" in src_name.lower() or "mandi" in src_name.lower()
-            mandi_note = f"\n*{MANDI_SOURCE_NOTE}*" if is_mandi else ""
-
-            # Heading: Source's exact NAME
-            st.markdown(f"**{src_name}**")
-            st.markdown(f"{status_str} {kind_tag}")
-            st.caption(time_str)
-            if is_mandi:
-                st.caption(MANDI_SOURCE_NOTE)
-            if not ok and note_text:
-                st.caption(f":red[{note_text}]")
-except Exception as e:
-    st.info(f"Source status unavailable: {e}")
-
-# 3. Read-only assumptions panel
-with st.expander("System Assumptions & Parameters (Read-only)", expanded=False):
-    try:
-        assumptions = api_client.get_assumptions()
-        st.json(assumptions)
-    except Exception as e:
-        st.caption(f"Assumptions could not be loaded: {e}")
-
-st.markdown("---")
-
-# 4. Dispatch Request Form
-st.subheader("Dispatch Details")
+now_ist = datetime.now(IST)
 
 # Session state initialization for include checkboxes
 deduction_keys = ["use_commission", "use_market_fee", "use_other", "use_hamali", "use_loading", "use_hold"]
 for key in deduction_keys:
     if key not in st.session_state:
-        # Default: all True except use_other
         st.session_state[key] = (key != "use_other")
 
-# One-click button to untick all Include boxes
-col_clear, _ = st.columns([2, 5])
-with col_clear:
-    if st.button("Clear deductions (untick all Include boxes)"):
-        for key in deduction_keys:
-            st.session_state[key] = False
-        st.rerun()
-
 with st.form("dispatch_form"):
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        origin_label = st.text_input("Origin Label", value="Pune")
-        origin_lat = st.number_input("Origin Latitude", value=18.5204, format="%.4f")
-        origin_lon = st.number_input("Origin Longitude", value=73.8567, format="%.4f")
-        origin_state = st.text_input("Origin State", value="Maharashtra")
-        quantity_qtl = st.number_input(
-            "Quantity (Quintals only, 1 qtl = 100 kg)",
-            min_value=0.1,
-            value=40.0,
-            step=1.0,
-            help="Strictly in Quintals"
-        )
-        max_dist_km = st.number_input("Max Search Distance (km)", min_value=50.0, max_value=1000.0, value=400.0, step=25.0)
-
-    with col2:
-        now_ist = datetime.now(IST)
-        dep_date = st.date_input("Preferred Departure Date", value=now_ist.date())
-        dep_time = st.time_input("Preferred Departure Time", value=now_ist.time().replace(second=0, microsecond=0))
-        loading_time_input = st.time_input("Loading Time", value=time(hour=max(0, now_ist.hour - 1), minute=0))
-
-        risk_mode = st.selectbox(
-            "Risk Mode",
-            options=["cvar25", "mean"],
+    # Commodity selection
+    col_c1, col_c2 = st.columns([1, 1])
+    with col_c1:
+        commodity_choice = st.selectbox(
+            "Commodity / फसल",
+            options=["Tomato", "Onion", "Potato", "Green Chilli", "Other"],
             index=0,
-            help="cvar25 optimizes for worst 25% of outcomes; mean optimizes for average net value"
+            help="Select agricultural commodity",
         )
+    with col_c2:
+        if commodity_choice == "Other":
+            commodity_name = st.text_input("Enter commodity name / फसल का नाम दर्ज करें", value="Tomato").strip() or "Tomato"
+        else:
+            commodity_name = commodity_choice
 
-        transport_mode = st.selectbox(
-            "Transport Rate Mode",
-            options=["per_km_per_trip", "fixed_per_trip", "per_qtl_per_km"],
-            index=0,
-        )
-        transport_rate = st.number_input("Transport Rate (₹)", min_value=0.0, value=30.0, step=1.0)
-        st.caption("Demo defaults (user input, not observed). Replace with your actual rates.")
+    # Input 1: Quantity
+    quantity_qtl = st.number_input(
+        f"1. Quantity of {commodity_name} (Quintals only, 1 qtl = 100 kg)"
+        if lang == "en"
+        else f"1. मात्रा / Quantity ({commodity_name}, क्विंटल में, 1 qtl = 100 kg)",
+        min_value=0.1,
+        value=40.0,
+        step=1.0,
+        help="Strictly in Quintals",
+    )
 
-    with col3:
-        st.markdown("**Optional Market & Handling Deductions** (leave blank if unknown)")
-        st.caption("Demo defaults (user input, not observed). Replace with your actual rates.")
+    # Input 2: Origin
+    st.markdown("**2. Origin Location**" if lang == "en" else "**2. प्रस्थान स्थान (Origin Location)**")
+    col_o1, col_o2, col_o3, col_o4 = st.columns(4)
+    with col_o1:
+        origin_label = st.text_input("Origin Label / स्थान का नाम", value="Pune")
+    with col_o2:
+        origin_state = st.text_input("Origin State / राज्य", value="Maharashtra")
+    with col_o3:
+        origin_lat = st.number_input("Origin Latitude / अक्षांश", value=18.5204, format="%.4f")
+    with col_o4:
+        origin_lon = st.number_input("Origin Longitude / देशांतर", value=73.8567, format="%.4f")
 
-        commission_pct = st.number_input("Commission (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.5)
-        use_commission = st.checkbox("Include Commission", key="use_commission")
+    # Input 3: Departure date + time
+    st.markdown("**3. Departure Timing**" if lang == "en" else "**3. प्रस्थान समय (Departure Timing)**")
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        dep_date = st.date_input("Preferred Departure Date / तारीख", value=now_ist.date())
+    with col_d2:
+        dep_time = st.time_input("Preferred Departure Time / समय", value=now_ist.time().replace(second=0, microsecond=0))
 
-        market_fee_pct = st.number_input("Market Fee (%)", min_value=0.0, max_value=100.0, value=2.0, step=0.5)
-        use_market_fee = st.checkbox("Include Market Fee", key="use_market_fee")
+    # Advanced settings expander
+    expander_title = "Advanced settings (for detailed users)" if lang == "en" else "Advanced settings (for detailed users) / विस्तृत सेटिंग्स"
+    with st.expander(expander_title, expanded=False):
+        col_adv1, col_adv2 = st.columns(2)
 
-        other_pct = st.number_input("Other Deductions (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
-        use_other = st.checkbox("Include Other %", key="use_other")
+        with col_adv1:
+            st.markdown("#### Transport & Routing")
+            transport_mode = st.selectbox(
+                "Transport Rate Mode",
+                options=["per_km_per_trip", "fixed_per_trip", "per_qtl_per_km"],
+                index=0,
+            )
+            transport_rate = st.number_input("Transport Rate (₹)", min_value=0.0, value=30.0, step=1.0)
+            st.caption("Demo defaults (user input, not observed). Replace with your actual rates.")
 
-        hamali_per_qtl = st.number_input("Hamali (₹ / quintal)", min_value=0.0, value=6.0, step=0.5)
-        use_hamali = st.checkbox("Include Hamali", key="use_hamali")
+            max_dist_km = st.number_input("Max Search Distance (km)", min_value=50.0, max_value=1000.0, value=400.0, step=25.0)
+            risk_mode = st.selectbox(
+                "Risk Mode",
+                options=["cvar25", "mean"],
+                index=0,
+                help="cvar25 optimizes for worst 25% of outcomes; mean optimizes for average net value",
+            )
+            loading_time_input = st.time_input("Loading Time", value=time(hour=max(0, now_ist.hour - 1), minute=0))
 
-        loading_per_qtl = st.number_input("Loading (₹ / quintal)", min_value=0.0, value=4.0, step=0.5)
-        use_loading = st.checkbox("Include Loading", key="use_loading")
+        with col_adv2:
+            st.markdown("#### Optional Market & Handling Deductions (leave blank if unknown)")
+            st.caption("Demo defaults (user input, not observed). Replace with your actual rates.")
+            clear_all_deductions = st.checkbox("Clear deductions (untick all optional deductions)", value=False)
 
-        hold_cost_per_hour = st.number_input("Hold Cost (₹ / hour)", min_value=0.0, value=100.0, step=10.0)
-        use_hold = st.checkbox("Include Hold Cost", key="use_hold")
+            commission_pct = st.number_input("Commission (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.5)
+            use_commission = st.checkbox("Include Commission", key="use_commission")
 
-    submitted = st.form_submit_button("Generate Plan Options", type="primary")
+            market_fee_pct = st.number_input("Market Fee (%)", min_value=0.0, max_value=100.0, value=2.0, step=0.5)
+            use_market_fee = st.checkbox("Include Market Fee", key="use_market_fee")
+
+            other_pct = st.number_input("Other Deductions (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5)
+            use_other = st.checkbox("Include Other %", key="use_other")
+
+            hamali_per_qtl = st.number_input("Hamali (₹ / quintal)", min_value=0.0, value=6.0, step=0.5)
+            use_hamali = st.checkbox("Include Hamali", key="use_hamali")
+
+            loading_per_qtl = st.number_input("Loading (₹ / quintal)", min_value=0.0, value=4.0, step=0.5)
+            use_loading = st.checkbox("Include Loading", key="use_loading")
+
+            hold_cost_per_hour = st.number_input("Hold Cost (₹ / hour)", min_value=0.0, value=100.0, step=10.0)
+            use_hold = st.checkbox("Include Hold Cost", key="use_hold")
+
+    submit_label = "Generate Plan Options" if lang == "en" else "प्लान बनाएं (Generate Plan Options)"
+    submitted = st.form_submit_button(submit_label, type="primary")
 
 if submitted:
     # Build timezone-aware datetimes in Asia/Kolkata
     pref_dt = datetime.combine(dep_date, dep_time).replace(tzinfo=IST)
     load_dt = datetime.combine(dep_date, loading_time_input).replace(tzinfo=IST)
 
+    apply_comm = use_commission and not clear_all_deductions
+    apply_mf = use_market_fee and not clear_all_deductions
+    apply_oth = use_other and not clear_all_deductions
+    apply_ham = use_hamali and not clear_all_deductions
+    apply_load = use_loading and not clear_all_deductions
+    apply_hld = use_hold and not clear_all_deductions
+
     payload: dict[str, Any] = {
-        "crop": "Tomato",
+        "crop": commodity_name,
         "quantity_qtl": float(quantity_qtl),
         "origin": {"lat": float(origin_lat), "lon": float(origin_lon)},
         "origin_label": origin_label,
@@ -181,12 +198,12 @@ if submitted:
         "costs": {
             "transport_mode": transport_mode,
             "transport_rate": float(transport_rate),
-            "commission_pct": float(commission_pct) if use_commission else None,
-            "market_fee_pct": float(market_fee_pct) if use_market_fee else None,
-            "other_pct": float(other_pct) if use_other else None,
-            "hamali_per_qtl": float(hamali_per_qtl) if use_hamali else None,
-            "loading_per_qtl": float(loading_per_qtl) if use_loading else None,
-            "hold_cost_per_hour": float(hold_cost_per_hour) if use_hold else None,
+            "commission_pct": float(commission_pct) if apply_comm else None,
+            "market_fee_pct": float(market_fee_pct) if apply_mf else None,
+            "other_pct": float(other_pct) if apply_oth else None,
+            "hamali_per_qtl": float(hamali_per_qtl) if apply_ham else None,
+            "loading_per_qtl": float(loading_per_qtl) if apply_load else None,
+            "hold_cost_per_hour": float(hold_cost_per_hour) if apply_hld else None,
         },
         "mandi_latest_arrival": {},
         "risk_mode": risk_mode,
@@ -201,6 +218,43 @@ if submitted:
             st.success(f"Plan generated successfully! Plan ID: `{res.get('plan_id')}` (Status: {res.get('status')})")
         except Exception as e:
             st.error(f"Failed to generate plan: {e}")
+
+st.markdown("---")
+
+# 3. Source Status strip (below the expander)
+st.markdown("### Source Status")
+try:
+    sources = api_client.get_sources_health()
+    cols = st.columns(len(sources) if sources else 1)
+    for i, src in enumerate(sources):
+        with cols[i]:
+            src_name = src.get("name") or src.get("source") or "unknown"
+            ok = src.get("ok", False)
+            status_str = "🟢 OK" if ok else "🔴 Failed"
+            kind_tag = format_kind_tag(src.get("kind"))
+            time_str = format_source_time(src.get("as_of"), src.get("fetched_at"))
+            note_text = src.get("note")
+
+            is_mandi = "agmarknet" in src_name.lower() or "mandi" in src_name.lower()
+
+            # Heading: Source's exact NAME
+            st.markdown(f"**{src_name}**")
+            st.markdown(f"{status_str} {kind_tag}")
+            st.caption(time_str)
+            if is_mandi:
+                st.caption(MANDI_SOURCE_NOTE)
+            if not ok and note_text:
+                st.caption(f":red[{note_text}]")
+except Exception as e:
+    st.info(f"Source status unavailable: {e}")
+
+# 4. Read-only assumptions panel (below the expander)
+with st.expander("System Assumptions & Parameters (Read-only)", expanded=False):
+    try:
+        assumptions = api_client.get_assumptions()
+        st.json(assumptions)
+    except Exception as e:
+        st.caption(f"Assumptions could not be loaded: {e}")
 
 # 5. Candidate Mandis & Re-plan with Closing Times
 if "plan_response" in st.session_state:

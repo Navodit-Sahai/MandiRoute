@@ -73,4 +73,22 @@ def test_ui_screens_required_elements():
     assert "format_kind_tag" in compare_code
     assert "[user_input]" in compare_code
 
+    dispatch_path = Path("app/ui/pages/3_Dispatch.py")
+    if not dispatch_path.exists():
+        dispatch_path = Path("app/ui/legacy/3_Dispatch.py")
+    dispatch_code = dispatch_path.read_text(encoding="utf-8")
+    assert "Approve Dispatch" in dispatch_code
+    assert "Reject Dispatch" in dispatch_code
+    assert "Delayed +30 min" in dispatch_code
+    assert "Delayed +60 min" in dispatch_code
+    assert "Arrived at Mandi" in dispatch_code
+    assert "Run watchdog tick now" in dispatch_code
+    assert "Run tick with fresh data" in dispatch_code
+    assert "Approve Re-plan" in dispatch_code
+    assert "Keep Current Plan" in dispatch_code
+    assert "WHAT_IF_TITLE" in dispatch_code
+    assert "WHAT_IF_TAG" in dispatch_code
+    assert "Watchdog Events Timeline" in dispatch_code
+
+
 

@@ -58,7 +58,7 @@ class Costs(BaseModel):
 
 
 class DispatchRequest(BaseModel):
-    crop: Literal["Tomato"] = "Tomato"
+    crop: str = "Tomato"
     quantity_qtl: float = Field(gt=0)            # QUINTALS ONLY (1 quintal = 100 kg)
     origin: LatLon
     origin_label: str

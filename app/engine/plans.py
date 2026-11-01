@@ -14,7 +14,7 @@ from app.contracts import (
     CandidateInputs, Condition, CoverageReport, DispatchRequest, Evidence, Plan, PlanOption, PlanSet, RouteOption,
 )
 from app.engine.commit import compute_commit_points
-from app.engine.coverage import grade_coverage
+from app.engine.coverage import grade_coverage, usable_price
 from app.engine.flips import compute_flips
 from app.engine.scenarios import evaluate_option, sort_options
 
@@ -41,7 +41,7 @@ def _reconsider_conditions(opt_a: PlanOption, typical_a: float, delay_flip_pct: 
 
 
 def _typical_price(cands: list[CandidateInputs], mandi_id: str) -> float:
-    return next(c.price.typical for c in cands if c.mandi_id == mandi_id and c.price is not None)
+    return next(c.price.typical for c in cands if c.mandi_id == mandi_id and c.price is not None)  # type: ignore[union-attr]
 
 
 def build_plan_set(
@@ -61,8 +61,9 @@ def build_plan_set(
     """
     coverage_report: CoverageReport = grade_coverage(req, cands, evidence, now, cfg)
 
-    # Collect priced candidates with usable routes
-    priced_cands: list[CandidateInputs] = [c for c in cands if c.price is not None]
+    # Priced candidates (positive price band), sorted so output never depends on input order
+    priced_cands: list[CandidateInputs] = sorted((c for c in cands if usable_price(c.price)),
+                                                 key=lambda c: c.mandi_id)
 
     if coverage_report.grade == "ABSTAIN" or not priced_cands:
         initial_ev_ids: list[str] = [e.id for e in evidence]
@@ -101,7 +102,7 @@ def build_plan_set(
             plans=[],
             robustness_a_best_in=0,
             robustness_of=9,
-            coverage=coverage_report,
+            coverage=CoverageReport(grade="ABSTAIN", items=[], reasons=["no usable route to any priced mandi"]),
             evidence_ids=[e.id for e in evidence],
         )
 

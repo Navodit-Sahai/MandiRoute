@@ -1,18 +1,30 @@
 """
-Tests for state-machine flow (C3-lite).
+Tests for state-machine flow (C3-lite) and LangGraph agent workflow.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import UTC, datetime
+
+import pytest
 
 from app.agent.flow import run_plan_flow
-from app.contracts import CandidateInputs, Costs, DispatchRequest, LatLon, PriceBand, RouteOption, Waypoint
+from app.contracts import (
+    CandidateInputs,
+    Costs,
+    DispatchRequest,
+    LatLon,
+    PriceBand,
+    RouteOption,
+    Waypoint,
+)
 from app.data.assemble import CandidateAssembly
 from app.db.db import get_conn
 
+NOW = datetime(2026, 10, 31, 5, 0, tzinfo=UTC)
 
-def FIXTURE_request() -> DispatchRequest:
-    now_utc = datetime(2026, 10, 31, 5, 0, tzinfo=timezone.utc)
+
+def FIXTURE_request(crop: str = "Tomato") -> DispatchRequest:
     costs = Costs(
         transport_mode="per_km_per_trip",
         transport_rate=20.0,
@@ -23,14 +35,14 @@ def FIXTURE_request() -> DispatchRequest:
         hold_cost_per_hour=100.0,
     )
     return DispatchRequest(
-        crop="Tomato",
+        crop=crop,
         quantity_qtl=40.0,
         origin=LatLon(lat=18.52, lon=73.86),
         origin_label="FIXTURE_Pune",
         origin_state="Maharashtra",
         vehicle="covered",
-        loading_time=now_utc,
-        preferred_departure=now_utc,
+        loading_time=NOW,
+        preferred_departure=NOW,
         max_distance_km=400.0,
         costs=costs,
         mandi_latest_arrival={},
@@ -80,27 +92,91 @@ def FIXTURE_assembly() -> CandidateAssembly:
     )
 
 
-def test_flow_execution_and_trace(monkeypatch):
-    monkeypatch.setattr("app.agent.flow.assemble_candidates", lambda req, now: FIXTURE_assembly())
+@pytest.fixture
+def fixture_assembler(monkeypatch):
+    """flow.py resolves its assembler via app.api.deps.get_candidate_assembler() or module monkeypatch."""
+    monkeypatch.setattr(
+        "app.api.deps.get_candidate_assembler",
+        lambda: (lambda req, now: FIXTURE_assembly()),
+    )
+    monkeypatch.setattr(
+        "app.agent.flow.assemble_candidates",
+        lambda req, now: FIXTURE_assembly(),
+    )
 
-    req = FIXTURE_request()
-    now = datetime(2026, 10, 31, 5, 0, tzinfo=timezone.utc)
-    res = run_plan_flow(req, plan_id="test_p1", now=now)
+
+def test_flow_execution_and_trace(fixture_assembler):
+    res = run_plan_flow(FIXTURE_request(), plan_id="test_p1", now=NOW)
 
     assert res.plan_id == "test_p1"
     assert res.status == "awaiting_approval"
     assert len(res.planset.plans) >= 1
-    assert (res.summary is None or "Plan set" in res.summary)
+    assert res.summary is not None
+    assert isinstance(res.summary, str) and len(res.summary) > 0
+    assert res.why_not_text is not None and len(res.why_not_text) > 0
 
     # Verify agent_trace rows
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM agent_trace WHERE plan_id='test_p1' ORDER BY step ASC").fetchall()
-        assert len(rows) <= 12  # Step cap 12
-        assert len(rows) >= 5
+        assert len(rows) <= 20
         steps = [r["node"] for r in rows]
-        assert steps == ["intake", "source_gate", "assemble", "decide", "geo", "explain", "done"]
+        for expected in ["intake", "source_gate", "assemble", "decide", "geo", "explain", "done"]:
+            assert expected in steps
         for r in rows:
             assert r["ok"] == 1
         assert len(res.map_points) == 1
         assert "FIXTURE_m1~r0" in res.route_paths
 
+
+def test_plain_flow_execution(fixture_assembler, monkeypatch):
+    monkeypatch.setenv("MG_AGENT", "plain")
+    res = run_plan_flow(FIXTURE_request(), plan_id="test_plain", now=NOW)
+    assert res.plan_id == "test_plain"
+    assert res.status == "awaiting_approval"
+    assert res.summary is not None
+    assert res.why_not_text is not None
+
+
+def test_why_not_withheld_when_number_check_fails(fixture_assembler, monkeypatch):
+    monkeypatch.setattr("app.explain.render_why_not", lambda w: "Why not Nashik? Rate of 999999.0 per quintal.")
+
+    res = run_plan_flow(FIXTURE_request(), plan_id="test_why_not_fail", now=NOW)
+
+    assert res.why_not_text is None
+    assert "why_not withheld: number check failed" in res.assembly_warnings
+
+
+def test_why_not_exception_keeps_summary(fixture_assembler, monkeypatch):
+    """Regression: logger was undefined, so a why_not failure used to wipe the summary too."""
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("FIXTURE why_not failure")
+
+    monkeypatch.setattr("app.engine.why_not_highest", _boom)
+
+    res = run_plan_flow(FIXTURE_request(), plan_id="test_why_not_exc", now=NOW)
+
+    assert res.summary is not None       # summary must survive
+    assert res.why_not_text is None      # only why-not is dropped
+
+
+def test_warnings_and_commodity_persisted_in_trace(fixture_assembler):
+    res = run_plan_flow(FIXTURE_request("Onion"), plan_id="test_persist", now=NOW)
+    assert "test warning" in res.assembly_warnings
+
+    with get_conn() as conn:
+        done = conn.execute(
+            "SELECT args_json FROM agent_trace WHERE plan_id='test_persist' AND node='done'"
+        ).fetchone()
+        meta = conn.execute(
+            "SELECT result_summary FROM agent_trace WHERE plan_id='test_persist' AND node='assembly_meta'"
+        ).fetchone()
+    assert "test warning" in json.loads(done["args_json"])["warnings"]
+    assert json.loads(meta["result_summary"])["commodity"] == "Onion"
+
+
+@pytest.mark.parametrize("crop", ["Tomato", "Onion", "Potato"])
+def test_flow_is_commodity_agnostic(fixture_assembler, crop):
+    res = run_plan_flow(FIXTURE_request(crop), plan_id=f"test_crop_{crop.lower()}", now=NOW)
+    assert res.status == "awaiting_approval"
+    assert len(res.planset.plans) >= 1

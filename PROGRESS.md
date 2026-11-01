@@ -64,10 +64,11 @@
 | ID | Module | Status | Branch/commit | Tests | Last updated | Notes |
 |---|---|---|---|---|---|---|
 | C1 | FastAPI + DB wiring + dev stubs | DONE (awaiting review) | stream-b | 11 tests | 2026-10-31 | `app/api/main.py`, `app/agent/flow.py`; live POST /plan returns A/B/C in 39.7s |
-| C2 | Telegram integration | NOT_STARTED | | | | deps M0; live-location only if A1 verifies |
-| C3 | LangGraph orchestrator | NOT_STARTED | | | | deps C1, A7, B5, B8, B9b |
-| C4 | Watchdog | NOT_STARTED | | | | deps C1, C3, B9 |
+| C2 | Telegram integration | DONE (awaiting review) | stream-c | 46 tests | 2026-10-31 | `app/integrations/telegram.py`, inline keyboard, security/version/idempotency checks, polling daemon, actions logging |
+| C3 | LangGraph orchestrator | DONE | integrate | 340+ | 2026-11-01 | LangGraph multi-agent + plain fallback MG_AGENT=plain |
+| C4 | Watchdog + monitoring endpoints | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | `app/agent/watchdog.py`, `app/api/main.py`; tick, progress, approve, notify, diff endpoints |
 | C5 (Part 1) | Streamlit UI (Plan & Compare screens) | DONE (awaiting review) | stream-c | 7 tests | 2026-10-31 | Screens 1 & 2 done; PyDeck map, A/B/C cards, format_inr, no forbidden words |
+| C5 (Part 2) | Dispatch & Monitor screen + what-if endpoint | DONE (awaiting review) | stream-c | 37 tests | 2026-10-31 | _Dispatch.py\, \POST /plans/{id}/whatif\, \GET /plans/{id}/events\, candidate trace blob, red-box what-if tagged \[what_if]\ |
 | C6 | What-if + Flip Finder (P1) | NOT_STARTED | | | | |
 | C7 | E2E tests + rehearsal | NOT_STARTED | | | | |
 
@@ -257,6 +258,13 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Live Verification: Gate G2 passed. Live `POST /plan` with Pune, Maharashtra origin returned status `awaiting_approval`, coverage `ACTIONABLE_WITH_CAVEATS`, and 3 plans (Plan A: APMC Panvel, Plan B: Pune(Pimpri), Plan C: APMC Panvel +2h) in 39.7s.
 - Blockers: None. Next module: C2 (Telegram integration) or C5 (Streamlit UI).
 
+### 2026-11-01 — Stream B — plain-language layer (additive, app/explain)
+- Files: `app/explain/templates.py` (+`plain_grade(grade, lang="hi")`, +`price_source_line(price_band, lang="hi", *, market)`), `app/explain/__init__.py` (exports), `tests/explain/test_plain.py` (new).
+- Tests: `pytest tests/explain -q` → 16 passed. `ruff check app/explain tests/explain` clean.
+- Assumptions: PriceBand has no market field → `market=` is a required keyword the caller passes (MandiCandidate name); no contract change. Dropped "aaj" from the Hindi line: record_date may not be today (would overstate freshness, AGENT §7). Unknown grade/lang → ValueError.
+- For Stream C: `from app.explain import plain_grade, price_source_line`; show `plain_grade(ps.grade, lang)` next to the grade; `price_source_line(band, lang, market=cand.name)` under each price.
+- Blockers: none. Next: C wires into UI.
+
 ### 2026-10-31 · Coordinator snapshot (evening) - READ THIS FIRST
 - **Working:** live `POST /plan` returned A/B/C (G2 VERIFIED). Telegram buttons verified. Ripening is OFF (SR-1/CR-5).
 - **Branches:** history is linear on `stream-b`: B8 -> B6 -> B7 -> B5 -> `ad4b705` (engine review: C rain_exposure None, A commit/flip/reconsider_if wired, B6 uses B4 closing rule) -> C1 `5e16805`. `stream-c` is aligned to it. Rule: Claude Code = worktree on `stream-b` (engine); Antigravity = `D:\nxt_launchpad` on `stream-c` (API/UI); sync with `git merge stream-b` on stream-c.
@@ -311,3 +319,125 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
   - Full test suite: 320 passed, 8 skipped (`pytest -q --tb=short`).
 - Audit Evidence: All 10 architecture verification criteria verified with YES and concrete terminal traces.
 - Blockers: None. Next module: C2 (Telegram notification integration) or G3/G5 end-to-end rehearsals.
+
+### 2026-10-31 · Stream C · session-C4-watchdog · Explainer wiring + C4 Watchdog & Monitoring Endpoints · status DONE (pending review)
+- Part 0 (Explainer wiring):
+  - Updated `app/agent/flow.py`: persisted `assembly_meta` trace node `{selected_grade, selected_variety}`; wired explain step with `render_plan_summary(planset, evidence_index)` and `check_numbers(summary, allowed_values(...))`; drops text with warning if number check fails.
+  - Returned `summary` in `POST /plan` and `GET /plans/{id}`. Displayed in `2_Compare.py` under cards in box titled "Plain-language summary (template, numbers checked)".
+  - Updated `tests/agent/test_flow.py` asserting non-empty summary string and `assembly_meta` trace node.
+- Part 1 (C4 Watchdog & Endpoints):
+  - Created `app/integrations/notify.py`: `notify(plan_id, kind, text, buttons)` logs to `actions` table.
+  - Created `app/agent/watchdog.py`: `tick_plan` with per-plan locking, refresh with pinned grade, `evaluate_triggers_and_recompute`, persistence to `watch_events`, `watch_state`, `plan_versions`, notification on replan proposal, and `diff_text = render_diff(diff, evidence_index)`. Background daemon thread enabled when `MG_WATCHDOG=1` in FastAPI lifespan.
+  - Endpoints in `app/api/main.py`: `POST /plans/{id}/approve` (enforcing valid dispatch/replan state transitions and 409 conflict checks), `POST /plans/{id}/progress` (parsing delay:30/60, passed:wp, manual ETA), `POST /plans/{id}/watch/tick` (?fresh=1 query support), and `GET /plans/{id}/diff` (PlanDiff + diff_text).
+- Tests: 30 passed in `tests/api`, `tests/agent`, `tests/ui` (including `test_watchdog_endpoints.py` covering approve/reject/409, progress, tick, diff, hysteresis, cooldown, no-fresh-data degradation, lock serialization, exception resilience).
+- Verification: live Pune plan `e523b823` exercised through approve (`monitoring`), progress #1 (`reported_delay_min: 60.0`), tick #1, progress #2, and tick #2.
+
+
+### 2026-10-31 · Stream C · session-C5-part2 · C5 Part 2 Dispatch & Monitor screen + what-if endpoint · status DONE (pending review)
+- Module: C5 Part 2 (`app/ui/pages/3_Dispatch.py`, `app/api/main.py`, `app/agent/flow.py`, `app/ui/format.py`, `app/ui/api_client.py`).
+- Endpoints & Flow:
+  - Candidates persistence: `app/agent/flow.py` stores assembled candidates as `agent_trace` node=`candidates` with candidate models dump and evidence ids. `GET /plans/{id}` excludes this blob.
+  - `POST /plans/{id}/whatif`: applies non-destructive scenario modifications to deep copies of candidates (delay_min, price_delta_pct on Plan A mandi, rain_mm_segment on Plan A route, closing_time overrides); recomputes with `build_plan_set`; renders `diff_text` via `render_diff`; never modifies or persists to `plan_versions` or `plans`.
+  - `GET /plans/{id}/events`: returns all watchdog monitoring events for the plan in chronological order.
+  - Added API client helpers in `app/ui/api_client.py`: `post_whatif`, `get_events`, `post_approve`, `post_progress`, `post_watch_tick`, `get_diff`.
+- UI Screen 3 (`3_Dispatch.py`):
+  - Plan picker default from session state or manual text input with validation.
+  - Status badge (awaiting_approval, monitoring, dispatched, replan_pending, rejected, abstained).
+  - Dispatch approval controls: "Approve Dispatch" / "Reject Dispatch".
+  - Progress updates: "Passed Waypoint N", "Delayed +30 min", "Delayed +60 min", "Arrived at Mandi".
+  - Watchdog controls: "Run watchdog tick now" and "Run tick with fresh data" showing triggers, persisted status, and diff.
+  - Re-plan approval panel: appears when status is `replan_pending`, displays diff_text and changed terms table with "Approve Re-plan" and "Keep Current Plan" buttons.
+  - Red-bordered box titled exactly "What-if scenario (user-set) - not observed" with inputs for delay, price change %, rain mm, closing time override; side-by-side comparison of original Plan A vs What-If Plan A; every number tagged `[what_if]`.
+  - Watchdog events timeline in reverse chronological order.
+- Compliance: AGENT §7 wording rules respected (no forbidden words), Ripening remains OFF (SR-1), no direct engine/data imports from UI.
+- Tests: 37 passed in `tests/ui`, `tests/api`, `tests/agent` (added `tests/api/test_whatif.py` and tests in `tests/ui/test_format.py`, `tests/ui/test_screens.py`).
+
+### 2026-10-31 ? Stream C ? session-C2-telegram ? Telegram integration + Why-Not wiring ? status DONE (pending review)
+- Part 0 (Why-Not wiring):
+  - Wired `why_not_highest` and `render_why_not` in `app/agent/flow.py`; verified via `check_numbers(text, allowed_values(w, {}))`; withheld with warning if check fails.
+  - Returned `why_not_text` in `POST /plan` and `GET /plans/{id}`; rendered in `app/ui/pages/2_Compare.py` inside "Why not the highest-price mandi?".
+  - Unit test in `tests/agent/test_flow.py` verifies why_not text and withholding behavior on check failure.
+- Part 1 (Telegram integration):
+  - Created `app/integrations/telegram.py`:
+    - `send()` with 20s timeout, retry, never raises, token redaction across URLs, errors, and actions logs.
+    - `build_callback_data()` with action|plan_id|version|arg (strictly <= 64 bytes) and `parse_callback_data()`.
+    - Polling thread `_telegram_polling_loop()` reading/persisting `tg_offset` to actions table.
+    - Security validation: `from.id == TG_CHAT_ID` and `chat.id == TG_CHAT_ID`; silent rejection of unauthorized attempts.
+    - Stale version rejection ("this button is out of date"), idempotency ("already done"), and button removal after use.
+    - Internal execution calling `apply_plan_approval` and `apply_plan_progress` (no HTTP self-calls).
+    - Wired `notify()` in `app/integrations/notify.py`: sends Telegram message when enabled, logs `message_id` receipt or error (ok=0/1) to actions table.
+    - Wired message templates: (a) plan proposal with Approve/Reject; (b) dispatch approved with check-in buttons (Passed waypoint, Delayed +30m, Delayed +60m, Arrived); (c) replan proposed with Approve replan / Keep current.
+- Part 2 (Demo script):
+  - Created `scripts/run_demo.ps1`: removes stale `DATAGOV_KEY`, sets `PYTHONPATH=.`, `MG_WATCHDOG=1`, `MG_DEMO=1`, `MG_TELEGRAM=1`, `MG_MODE=live`, launches FastAPI on port 8000 and Streamlit on port 8501 in separate PowerShell windows. Contains no secrets.
+- Tests & Verification:
+  - 8 new tests in `tests/api/test_telegram.py` using `responses` covering unauthorized rejection, stale version, double tap idempotence, callback_data byte length <= 64, token redaction in logs/DB, failure resilience during approval, offset persistence, and thread exception resilience.
+  - 46 tests passing across `tests/api`, `tests/agent`, and `tests/ui`.
+  - Live verification with `MG_TELEGRAM=1`: Pune plan `23d2af56` created, proposal message sent (`message_id: 5`), dispatch approved, and check-in buttons message sent (`message_id: 6`).
+
+### 2026-11-01 · Stream C · session-compare-tags-fix · Compare page computed tags fix · status DONE (pending review)
+- Fix:
+  - Added `tag_for(value, evidence_id=None, source=None)` in `app/ui/format.py`: returns `[computed]` when `source="computed"` is explicitly passed for engine calculations (Flip Boundaries, Commitment Points, Reconsider conditions, Robustness, Window feasibility, and Net values). Returns `:red[[untagged]]` only when neither an evidence_id nor source is given. Preserves existing evidence-based tags (`[observed]`, `[forecast]`, `[proxy]`).
+  - Updated `app/ui/pages/2_Compare.py`: replaced `format_kind_tag(None)` with `tag_for(source='computed')` across all engine calculation lines.
+  - Added unit test in `tests/ui/test_format.py` verifying `tag_for` with engine calculations, unexplained values, and evidence lookups.
+- Verification:
+  - All 47 Stream C tests passed (`pytest tests/ui tests/api tests/agent`).
+  - Verified live on Pune plan `23d2af56`: zero `[untagged]` values remain anywhere on the Compare screen.
+
+
+### 2026-11-01 · Stream C · session-simplify-ui · Simplify Plan & Compare pages for non-technical users · status DONE (pending review)
+- Module: UI simplification for non-technical users (app/ui/pages/1_Plan.py, app/ui/pages/2_Compare.py, app/ui/format.py, tests/ui/test_format.py).
+- Changes:
+  1. Language selector: Added Hindi / English toggle at top of Plan and Compare pages, persisted in st.session_state['lang'].
+  2. Plan page: Default view shows only 3 required inputs (Quantity in qtl, Origin location, Departure date+time). Advanced parameters (transport rate/mode, handling & market deductions, clear deductions, risk mode, loading time, max distance) placed inside collapsed expander 'Advanced settings (for detailed users)'. Source Status strip and read-only assumptions panel kept below expander.
+  3. Compare page: Added plain-language summary box per plan above detailed cards using app.explain.plain_grade, price_source_line, and translate_top_caveat (translating top coverage caveats such as closing time unknown to Hindi: 'mandi band hone ka time pata nahi, nikalne se pehle phone kar lein' and English). Preserved all existing detailed cards, scenario results, flip boundaries, commitment points, and evidence ledger inside collapsed expander 'Detailed view (for technical users / judges)'.
+  4. Helpers & Tests: Added translate_top_caveat and format_plain_summary in app/ui/format.py; added unit tests in tests/ui/test_format.py covering translations and forbidden words check.
+- Tests & Verification:
+  - 16 passed in tests/ui.
+  - 65 passed across tests/ui, tests/api, tests/agent, tests/explain.
+  - 346 passed across full repo test suite (pytest -q --tb=short).
+  - ruff check app/ui tests/ui clean.
+- Assumptions & Blockers: None. Next module: Demo walkthrough / Final user review.
+
+
+### 2026-11-01 · Stream C · session-generalize-commodity · Generalize crop support beyond Tomato · status DONE (pending review)
+- Changes:
+  1. Contracts: Changed DispatchRequest.crop from Literal['Tomato'] = 'Tomato' to str = 'Tomato' in app/contracts/inputs.py, allowing any commodity (e.g. Onion, Potato, Green Chilli) while preserving Tomato default.
+  2. Plan UI (1_Plan.py): Added Commodity / फसल selector (Tomato, Onion, Potato, Green Chilli, Other) to the dispatch form, dynamically labeling quantity and passing the selected commodity in the request payload.
+  3. Home UI (home.py): Updated landing headings and workflow descriptions to general agricultural commodity dispatch.
+- Tests & Verification:
+  - 16 passed in tests/ui.
+  - 346 passed full repo test suite (pytest -q --tb=short).
+  - ruff check clean.
+
+
+### 2026-11-01 · Stream C · session-deployment · Module A9-lite Deployment (FastAPI + Streamlit on Render) · status DONE (pending review)
+- Module: A9-lite Deployment configuration for Render (render.yaml, README_DEPLOY.md, .env.example, .gitignore, app/api/main.py, app/ui/api_client.py, app/ui/home.py, app/agent/flow.py, app/agent/watchdog.py).
+- Changes:
+  1. API Base URL (UI): Configured in app/ui/api_client.py via MG_API_URL (default http://localhost:8000), with scheme handling for Render hostnames. Updated app/ui/home.py warning.
+  2. CORS (API): In app/api/main.py, replaced hardcoded origins with MG_CORS_ORIGINS env var (comma-separated, default http://localhost:8501), never using wildcard * with credentials.
+  3. Process & Deployment Blueprint: Created render.yaml defining two web services (mandiguard-api and mandiguard-ui), pinning Python 3.12.7, uvicorn with --workers 1 to guarantee single-instance watchdog and Telegram polling, 1 GB persistent disk mounted at /var/data on API, and secrets marked sync: false.
+  4. SQLite Persistence: Verified app/db/db.py is env-configurable via DB_PATH (/var/data/mandiguard.db).
+  5. Secrets & Gitignore: Added *.db to .gitignore. Generated .env.example with EMPTY values only.
+  6. Documentation: Created README_DEPLOY.md (29 lines) documenting deploy steps, env vars table, key rotation, restart instructions, and limits (free tier idle wake-up, 100s proxy timeout).
+  7. Timeouts: Confirmed live first POST /plan takes ~40s (G2 was 39.7s), well within Render's 100s gateway timeout.
+- Environment Variables List:
+  DATAGOV_KEY, TG_TOKEN, TG_CHAT_ID, MG_API_URL, MG_CORS_ORIGINS, PORT, MG_MODE, MG_WATCHDOG, MG_TELEGRAM, MG_DEMO, MG_PRICE_UNIT_VERIFIED, DB_PATH, MG_COORDS_CSV, MG_CONTACT_EMAIL, DATAGOV_STATE_FILTER.
+- Tests & Verification:
+  - 347 passed full test suite (pytest -q --tb=short).
+  - ruff check clean on edited folders.
+  - Local verification with non-default MG_API_URL and MG_CORS_ORIGINS passed: GET /health returned 200 with CORS headers, GET /sources/health probed 6 sources ok.
+- Assumptions & Blockers: None.
+
+### 2026-11-01 · Integration Session · Merge stream-c and stream-b into main LangGraph graph · status DONE
+- Scope: Resolved merge conflicts between origin/main (LangGraph workflow) and stream-c (commodity generalization, plain-flow fallback, Telegram bot, watchdog, Render deployment files), followed by merging stream-b.
+- Changes:
+  1. Resolved 7-file conflict in integrate branch: PROGRESS.md, app/agent/flow.py, app/api/main.py, app/ui/api_client.py, app/ui/pages/1_Plan.py, app/ui/pages/2_Compare.py, tests/agent/test_flow.py.
+  2. Preserved LangGraph workflow as default; added clean fallback to plain orchestrator when MG_AGENT=plain via app/agent/flow_plain.py.
+  3. Ensured trace contract adherence across nodes: geo, explain, candidates, assembly_meta, done.
+  4. Preserved Telegram handler, background watchdog, and watchdog HTTP endpoints under thread-safe plan locks.
+  5. Moved legacy 3_Dispatch.py to app/ui/legacy/3_Dispatch.py, keeping teammate's 3_Dispatch_and_Monitor.py as primary Dispatch & Active Monitoring page with dynamic replan approval wired to latest_version.
+  6. Merged stream-b cleanly; retained integrate version of tests/agent/test_flow.py.
+- Tests & Verification:
+  - Default LangGraph suite: 375 passed, 1 skipped, 0 failed.
+  - MG_AGENT=plain fallback suite: 375 passed, 1 skipped, 0 failed.
+  - V1–V10 checks fully verified.

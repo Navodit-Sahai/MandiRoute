@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: mandiguard-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    disk:
+      name: mandiguard-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: MG_MODE
+        value: live
+      - key: MG_WATCHDOG
+        value: "1"
+      - key: MG_TELEGRAM
+        value: "1"
+      - key: MG_DEMO
+        value: "1"
+      - key: DB_PATH
+        value: /var/data/mandiguard.db
+      - key: MG_CORS_ORIGINS
+        value: https://mandiguard-ui.onrender.com,http://localhost:8501
+      - key: DATAGOV_KEY
+        sync: false
+      - key: TG_TOKEN
+        sync: false
+      - key: TG_CHAT_ID
+        sync: false
+
+  - type: web
+    name: mandiguard-ui
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app/ui/home.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: MG_MODE
+        value: live
+      - key: MG_API_URL
+        value: https://mandiguard-api.onrender.com

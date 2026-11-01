@@ -15,7 +15,9 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.contracts.evidence import Evidence
+from app.contracts.inputs import PriceBand
 from app.contracts.plans import Plan, PlanDiff, PlanOption, PlanSet, ScenarioResult
+from app.engine.whynot import WhyNot, WhyNotReason, WhyNotScenario
 
 FORBIDDEN_PHRASES: tuple[str, ...] = (
     "real-time prices", "predicted price range", "road flooded", "spoilage %", "quality loss",
@@ -172,6 +174,55 @@ def render_diff(diff: PlanDiff, evidence_index: dict[str, Evidence]) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------- why not the highest price
+PRICE_TEXT: dict[str, str] = {"low": "low price", "typical": "typical price", "high": "high price"}
+
+
+def _scen_label(r: WhyNotScenario) -> str:
+    return f"{PRICE_TEXT[r.price_level]}, {SCENARIO_TEXT[r.delay_level]}"
+
+
+def _reason_text(r: WhyNotReason, w: WhyNot) -> str:
+    if r.kind == "transport":
+        return (f"longer distance/transport cost: Rs {_num(r.amount_rs or 0.0, 0)} more "
+                f"({_num(w.highest_distance_km or 0.0)} km vs {_num(w.a_distance_km or 0.0)} km) [computed]")
+    if r.kind == "window":
+        head: str = "closing time missed" if r.window_status == "missed" else WINDOW_TEXT["unknown"]
+        extra: str = f": hold cost Rs {_num(r.amount_rs, 0)} more" if r.amount_rs is not None else ""
+        return f"window missed or unknown ({head}){extra} [computed]"
+    if r.kind == "hold":
+        return f"hold cost: Rs {_num(r.amount_rs or 0.0, 0)} more [computed]"
+    return f"lower price at this price level: Rs {_num(r.amount_rs or 0.0, 0)} less after deductions [computed]"
+
+
+def render_why_not(w: WhyNot) -> str:
+    """Template text for WhyNot; every number is a field of w (verify with check_numbers(text, allowed_values(w, {})))."""
+    if w.status == "no_plan":
+        return "No Plan A to compare with."
+    if w.status == "no_alternative":
+        return f"No other priced mandi with a usable route to compare with {w.a_mandi_name}."
+    if w.status == "a_is_highest":
+        return (f"Plan A ({w.a_mandi_name}) already has the highest typical price "
+                f"({_money(w.a_typical_price or 0.0)}/qtl, Price reported today) of the compared mandis.")
+    lines: list[str] = [
+        (f"Why not {w.highest_mandi_name}? Highest typical price {_money(w.highest_typical_price or 0.0)}/qtl vs "
+         f"{_money(w.a_typical_price or 0.0)}/qtl at Plan A ({w.a_mandi_name}) [observed]"),
+    ]
+    wins: list[str] = [_scen_label(r) for r in w.scenarios if r.gap_rs > 0.5]
+    if wins:
+        lines.append(f"{w.highest_mandi_name} beats A in {w.wins_in} of {w.of} tested scenarios: {'; '.join(wins)}")
+    else:
+        lines.append(f"{w.highest_mandi_name} beats A in none of the {w.of} tested scenarios")
+    lines.append(f"It loses to A in {w.loses_in} of {w.of} tested scenarios" + (":" if w.loses_in else ""))
+    for r in w.scenarios:
+        if not r.loses:
+            continue
+        lines.append(f"  - {_scen_label(r)}: net {_money(r.net_highest)} vs {_money(r.net_a)} at A "
+                     f"({_money(abs(r.gap_rs))} less) [computed]")
+        lines.extend(f"      {_reason_text(x, w)}" for x in r.reasons)
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------- number check
 def _walk(obj: Any) -> Iterable[float]:
     if isinstance(obj, bool) or obj is None:
@@ -216,3 +267,46 @@ def check_numbers(text: str, allowed_values: list[float], tol: float = 0.01) -> 
         if not any(abs(x - abs(v)) <= max(half_unit, tol * abs(v)) for v in allowed_values):
             bad.append(tok)
     return bad
+
+
+# ---------------------------------------------------------------- plain-language layer (additive)
+_PLAIN_GRADE: dict[str, dict[str, str]] = {
+    "hi": {
+        "ACTIONABLE": "Theek hai, bhej sakte ho",
+        "ACTIONABLE_WITH_CAVEATS": "Bhej sakte ho, par kuch baatein pata nahi (neeche dekhein)",
+        "ADVISORY_ONLY": "Dhyan se - kai baatein pata nahi, aap khud faisla lein",
+        "ABSTAIN": "Abhi salah nahi de sakte - data kaafi nahi hai",
+    },
+    "en": {
+        "ACTIONABLE": "OK to send",
+        "ACTIONABLE_WITH_CAVEATS": "OK to send, but some things are unknown",
+        "ADVISORY_ONLY": "Use caution - several things are unknown, decide yourself",
+        "ABSTAIN": "Cannot advise yet - not enough data",
+    },
+}
+
+_PRICE_SOURCE: dict[str, str] = {
+    "hi": "Yeh price {record_date} ko {market} mandi mein record hua (sarkari data.gov.in se).",
+    "en": "This price was recorded on {record_date} at {market} mandi (government data, data.gov.in).",
+}
+
+
+def _lang_table(table: dict[str, Any], lang: str) -> Any:
+    if lang not in table:
+        raise ValueError(f"unsupported lang {lang!r}; use 'hi' or 'en'")
+    return table[lang]
+
+
+def plain_grade(grade: str, lang: str = "hi") -> str:
+    """Farmer-facing sentence for a PlanSet grade. Contains no numbers."""
+    tbl = _lang_table(_PLAIN_GRADE, lang)
+    if grade not in tbl:
+        raise ValueError(f"unknown grade {grade!r}")
+    return tbl[grade]
+
+
+def price_source_line(price_band: PriceBand, lang: str = "hi", *, market: str) -> str:
+    """Where a price came from, using the band's own record_date. PriceBand carries no market name,
+    so the caller passes it (e.g. MandiCandidate name). No data fetch."""
+    tpl = _lang_table(_PRICE_SOURCE, lang)
+    return tpl.format(record_date=price_band.record_date, market=market)
