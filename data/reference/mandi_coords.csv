@@ -1,11 +1,28 @@
 mandi_id,market,district,state,lat,lon,precision,verified,source,note
-maharashtra__pune__pune-manjri,Pune(Manjri),Pune,Maharashtra,18.5007126,73.9687157,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__pune__pune-moshi,Pune(Moshi),Pune,Maharashtra,18.6523154,73.8442032,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__pune__khed-chakan,Khed(Chakan),Pune,Maharashtra,18.7623111,73.8625448,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__pune__pune-pimpri,Pune(Pimpri),Pune,Maharashtra,18.6231854,73.8019932,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__nashik__apmc-ghoti,APMC Ghoti,Nashik,Maharashtra,19.7167761,73.6244742,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__nagpur__apmc-kalmeshwar,APMC Kalmeshwar,Nagpur,Maharashtra,21.2374393,78.9081689,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__nagpur__apmc-hingna,APMC Hingna,Nagpur,Maharashtra,20.9916033,78.8732421,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__nagpur__apmc-ramtek,APMC Ramtek,Nagpur,Maharashtra,21.3935847,79.2999141,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__nagpur__apmc-nagpur,APMC Nagpur,Nagpur,Maharashtra,21.164495,79.147645,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
-maharashtra__mumbai__apmc-mumbai,APMC Mumbai,Mumbai,Maharashtra,19.07695797,73.00706632,market,1,manual_verified_on_map,checked on OpenStreetMap by YourName
+maharashtra__nagpur__apmc-nagpur,APMC Nagpur,Nagpur,Maharashtra,21.164495,79.147645,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__ahilyanagar__apmc-sangamner,APMC Sangamner,Ahilyanagar,Maharashtra,19.4906351,74.2466821,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__amarawati__amrawati-frui-veg-market,Amrawati(Frui & Veg. Market),Amarawati,Maharashtra,20.93765754,77.75446975,market,1,not-found,verified by operator 2026-11-01
+maharashtra__jalgaon__apmc-jalgaon,APMC Jalgaon,Jalgaon,Maharashtra,20.99806893,75.57841125,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__pune__pune-manjri,Pune(Manjri),Pune,Maharashtra,18.5007126,73.9687157,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__pune__pune-moshi,Pune(Moshi),Pune,Maharashtra,18.6523154,73.8442032,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__nagpur__apmc-kalmeshwar,APMC Kalmeshwar,Nagpur,Maharashtra,21.2374393,78.9081689,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__satara__apmc-karad,APMC Karad,Satara,Maharashtra,17.2852127,74.1822147,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__solapur__apmc-solapur,APMC Solapur,Solapur,Maharashtra,17.68056508,75.92614115,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__chattrapati-sambhajinagar__apmc-chattrapati-sambhajinagar,APMC Chattrapati Sambhajinagar,Chattrapati Sambhajinagar,Maharashtra,19.90621943,75.3601294,market,1,not-found,verified by operator 2026-11-01
+maharashtra__dharashiv__apmc-dharashiv,APMC Dharashiv,Dharashiv,Maharashtra,18.1853567,76.0420253,district_centroid,1,nominatim,verified by operator 2026-11-01
+maharashtra__jalgaon__apmc-bhusaval,APMC Bhusaval,Jalgaon,Maharashtra,21.0472554,75.7880594,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__mumbai__apmc-mumbai,APMC Mumbai,Mumbai,Maharashtra,19.07695797,73.00706632,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__kolhapur__apmc-kolhapur,APMC Kolhapur,Kolhapur,Maharashtra,16.70573577,74.26566477,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__satara__apmc-vai,APMC Vai,Satara,Maharashtra,17.9423742,73.9192535,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__pune__khed-chakan,Khed(Chakan),Pune,Maharashtra,18.7623111,73.8625448,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__solapur__apmc-akluj,APMC Akluj,Solapur,Maharashtra,17.8930069,75.0204482,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__pune__pune-pimpri,Pune(Pimpri),Pune,Maharashtra,18.6231854,73.8019932,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__kolhapur__apmc-vadgaonpeth,APMC Vadgaonpeth,Kolhapur,Maharashtra,16.83066902,74.31736378,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__ahilyanagar__apmc-rahuri,APMC Rahuri,Ahilyanagar,Maharashtra,19.4031555,74.6105605,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__nashik__apmc-ghoti,APMC Ghoti,Nashik,Maharashtra,19.7167761,73.6244742,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__sangli__apmc-vita,APMC Vita,Sangli,Maharashtra,17.271977,74.5372841,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__nagpur__apmc-hingna,APMC Hingna,Nagpur,Maharashtra,20.9916033,78.8732421,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__raigad__apmc-panvel,APMC Panvel,Raigad,Maharashtra,18.9895249,73.1221935,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__satara__apmc-patan,APMC Patan,Satara,Maharashtra,17.3565267,73.8634207,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__solapur__apmc-pandharpur,APMC Pandharpur,Solapur,Maharashtra,17.7255921,75.3001936,market,1,nominatim,verified by operator 2026-11-01
+maharashtra__nagpur__apmc-ramtek,APMC Ramtek,Nagpur,Maharashtra,21.3935847,79.2999141,market,1,nominatim,verified by operator 2026-11-01
