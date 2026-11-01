@@ -263,7 +263,7 @@ else:
 st.markdown("### Agent Execution Trace")
 try:
     traces = api_client.get_plan(selected_plan_id)  # from agent trace table
-    trace_rows = api_client.requests.get(f"{api_client.api_url()}/plans/{selected_plan_id}/trace").json()
+    trace_rows = api_client.get_plan_trace(selected_plan_id)
     if trace_rows:
         st.dataframe(
             [
