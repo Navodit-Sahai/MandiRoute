@@ -1,14 +1,13 @@
 """
-Plain state-machine orchestrator (C3-lite). NO LangGraph, NO LLM.
+Agent Orchestrator powered by LangGraph.
+Executes autonomous multi-agent workflow for dispatch planning.
 
-Steps:
-  1. intake (validate input)
-  2. source_gate (check environment/mode readiness)
-  3. assemble (fetch candidates, prices, routes, weather)
-  4. decide (call engine build_plan_set once)
-  5. geo (extract map_points and route_paths for UI)
-  6. explain (render summary via app.explain if installed, else None)
-  7. done (finalize flow result)
+Agents:
+  - intake_gate_agent: Validates request parameters & checks system mode
+  - data_assembly_agent: Gathers candidate mandis, prices, routes, and route weather
+  - critic_agent: Audits candidate data completeness and feasibility
+  - decision_agent: Evaluates scenario grid, CVaR25, commit points, flips, coverage & geo extraction
+  - explainer_agent: Generates approved natural language summary, number audits & finalizes status
 
 Every step is recorded to the agent_trace SQLite table.
 """
@@ -25,6 +24,7 @@ from app.contracts import CoverageReport, DispatchRequest, PlanSet, SourceStatus
 from app.data.assemble import CandidateAssembly, assemble_candidates
 from app.db.db import get_conn
 from app.engine.plans import build_plan_set
+from app.agent.graph.workflow import execute_plan_graph
 
 STEP_CAP = 12
 
@@ -65,179 +65,24 @@ def _record_trace(
 
 def run_plan_flow(req: DispatchRequest, plan_id: str, now: datetime) -> FlowResult:
     """
-    Execute the plan orchestration state machine with step recording.
+    Execute the plan orchestration workflow using the multi-agent LangGraph workflow.
     Step cap is 12.
     """
-    cfg = get_settings()
-    step_num = 1
-    trace_id = plan_id
+    final_state = execute_plan_graph(req, plan_id, now)
 
-    # 1. Intake: Validate request
-    ts_now = now.isoformat()
-    intake_args = json.dumps({"crop": req.crop, "origin": req.origin_label, "quantity_qtl": req.quantity_qtl})
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="intake",
-        tool=None,
-        args_json=intake_args,
-        result_summary="Request input validated",
-        ok=True,
-        ts=ts_now,
-    )
-    step_num += 1
-
-    # 2. Source Gate: Check system mode & source readiness
-    current_mode = guards.mode()
-    gate_args = json.dumps({"mode": current_mode})
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="source_gate",
-        tool="app.guards.mode",
-        args_json=gate_args,
-        result_summary=f"Operating mode is '{current_mode}'",
-        ok=True,
-        ts=ts_now,
-    )
-    step_num += 1
-
-    # 3. Assemble: Fetch candidate mandis, prices, routes, and weather
-    assemble_args = json.dumps({"origin": [req.origin.lat, req.origin.lon], "max_km": req.max_distance_km})
-    try:
-        assembly: CandidateAssembly = assemble_candidates(req, now)
-        assemble_summary = (
-            f"Assembled {len(assembly.candidates)} candidates, "
-            f"{len(assembly.evidence)} evidence items, {len(assembly.warnings)} warnings"
-        )
-        assemble_ok = True
-    except Exception as exc:
-        assemble_summary = f"Assembly failed: {exc}"
-        assemble_ok = False
-        _record_trace(
-            plan_id=plan_id,
-            step=step_num,
-            node="assemble",
-            tool="app.data.assemble.assemble_candidates",
-            args_json=assemble_args,
-            result_summary=assemble_summary,
-            ok=False,
-            ts=ts_now,
-        )
-        raise
-
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="assemble",
-        tool="app.data.assemble.assemble_candidates",
-        args_json=assemble_args,
-        result_summary=assemble_summary,
-        ok=assemble_ok,
-        ts=ts_now,
-    )
-    step_num += 1
-
-    # 4. Decide: Build plan set using decision engine (ONE call)
-    decide_args = json.dumps({"candidate_count": len(assembly.candidates), "risk_mode": req.risk_mode})
-    planset: PlanSet = build_plan_set(
-        req=req,
-        cands=assembly.candidates,
-        evidence=assembly.evidence,
-        now=now,
-        cfg=cfg,
-        plan_id=plan_id,
-        version=1,
-    )
-    decide_summary = f"PlanSet v1 created with {len(planset.plans)} plans (coverage: {planset.coverage.grade})"
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="decide",
-        tool="app.engine.build_plan_set",
-        args_json=decide_args,
-        result_summary=decide_summary,
-        ok=True,
-        ts=ts_now,
-    )
-    step_num += 1
-
-    # 5. Geo extraction: map points and routes for UI
-    map_points: list[dict[str, Any]] = [
-        {
-            "mandi_id": c.mandi_id,
-            "name": c.mandi_name,
-            "lat": c.location.lat,
-            "lon": c.location.lon,
-            "precision": c.location_precision,
-        }
-        for c in assembly.candidates
-    ]
-    used_route_ids = {p.option.route_id for p in planset.plans}
-    route_paths: dict[str, list[list[float]]] = {}
-    for c in assembly.candidates:
-        for r in c.routes:
-            if r.route_id in used_route_ids and r.route_id not in route_paths:
-                route_paths[r.route_id] = [[wp.point.lat, wp.point.lon] for wp in r.waypoints]
-
-    geo_summary = json.dumps({"map_points": map_points, "route_paths": route_paths})
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="geo",
-        tool="extract_geo_points",
-        args_json="{}",
-        result_summary=geo_summary,
-        ok=True,
-        ts=ts_now,
-    )
-    step_num += 1
-
-    # 6. Explain: Render summary if explainer module exists
-    summary: Optional[str] = None
-    explain_summary = "Explainer not installed, summary=None"
-    try:
-        from app.explain import render_plan_summary  # type: ignore[import-not-found]
-        evidence_index = {e.id: e for e in assembly.evidence}
-        summary = render_plan_summary(planset, evidence_index)
-        explain_summary = "Plan summary rendered"
-    except ImportError:
-        summary = None
-
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="explain",
-        tool="app.explain.render_plan_summary" if summary else None,
-        args_json="{}",
-        result_summary=explain_summary,
-        ok=True,
-        ts=ts_now,
-    )
-    step_num += 1
-
-    # 7. Done: Finalize status
-    is_abstained = planset.coverage.grade == "ABSTAIN" or len(planset.plans) == 0
-    final_status = "abstained" if is_abstained else "awaiting_approval"
-    _record_trace(
-        plan_id=plan_id,
-        step=step_num,
-        node="done",
-        tool=None,
-        args_json="{}",
-        result_summary=f"Flow completed with status={final_status}",
-        ok=True,
-        ts=ts_now,
-    )
+    assembly = final_state.get("assembly")
+    planset = final_state.get("planset")
+    warnings = list(assembly.warnings) if assembly else final_state.get("warnings", [])
+    source_status = list(assembly.source_status) if assembly else final_state.get("source_status", [])
 
     return FlowResult(
         plan_id=plan_id,
-        status=final_status,
+        status=final_state.get("status", "abstained"),
         planset=planset,
-        assembly_warnings=assembly.warnings,
-        source_status=assembly.source_status,
-        trace_id=trace_id,
-        summary=summary,
-        map_points=map_points,
-        route_paths=route_paths,
+        assembly_warnings=warnings,
+        source_status=source_status,
+        trace_id=plan_id,
+        summary=final_state.get("summary"),
+        map_points=final_state.get("map_points", []),
+        route_paths=final_state.get("route_paths", {}),
     )

@@ -6,6 +6,17 @@ and plan submission with closing-time re-planning.
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure repository root is on sys.path so 'app' package is always resolvable
+for parent in Path(__file__).resolve().parents:
+    if (parent / 'app').is_dir():
+        if str(parent) not in sys.path:
+            sys.path.insert(0, str(parent))
+        break
+
+
 from datetime import datetime, time
 import zoneinfo
 from typing import Any

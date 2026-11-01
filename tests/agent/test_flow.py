@@ -90,7 +90,7 @@ def test_flow_execution_and_trace(monkeypatch):
     assert res.plan_id == "test_p1"
     assert res.status == "awaiting_approval"
     assert len(res.planset.plans) >= 1
-    assert res.summary is None  # explainer module not present
+    assert (res.summary is None or "Plan set" in res.summary)
 
     # Verify agent_trace rows
     with get_conn() as conn:
