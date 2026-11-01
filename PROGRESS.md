@@ -297,3 +297,17 @@ Honest note: ripening was the crop-specific part of the pitch. Do not describe t
 - Tests run: 320 passed (312 passed, 8 skipped offline live-api tests).
 - Non-negotiables upheld: NN-1 (no fake/fallback data), NN-8 (deterministic engine math only; no LLM math), NN-10 (unknown != zero; missing data causes abstain/retain without failure), NN-11 (explicit human approval required for dispatch and plan revisions). Ripening disabled per SR-1/CR-5.
 - Next module: C2 (Telegram notification integration) or end-to-end rehearsals (G3/G5).
+
+### 2026-11-01 · Stream C · session-cli-trace-verifier · Interactive CLI Demonstration & LangGraph Execution Tracing · status VERIFIED
+- Module: Interactive Terminal CLI, Execution Tracer, and Architecture Verifier (`cli.py`, `app/cli.py`, `app/agent/graph/tracer.py`).
+- Files modified / created:
+  - `app/agent/graph/tracer.py`: Real-time execution tracer instrumenting Pregel nodes (start/end timestamps, input/output state, status), discrete pure tools (arguments masked, API/data sources, provenance tags, execution duration, status), conditional routing edges (source node, router function, condition evaluated, selected edge, unselected edges with explicit reasons), graph execution summary, and compiled graph topology inspector (`inspect_compiled_graph_topology`).
+  - `app/agent/graph/workflow.py`: Instrumented all 11 nodes and 4 conditional branch routers with live tracing hooks and summary printing.
+  - `app/agent/graph/tools.py`: Instrumented all 13 pure tools with execution start/end timings and data provenance logging.
+  - `app/cli.py` & `cli.py`: Interactive and demo CLI entry point executing the genuine user journey: user requirement intake -> live candidate assembly -> initial plan generation -> operator dispatch approval (NN-11) -> real-time driver delay ingress -> Monitoring Tick 1 (hysteresis check 1/2 -> retain_plan) -> Monitoring Tick 2 (hysteresis met 2/2 -> replan triggered -> PlanSet v2 generated with Panvel -> Pune Pimpri destination swap and Rs 1,032 score gain) -> operator approval of revision (NN-11) -> Monitoring Tick 3 (monitoring resumed under Plan v2 -> retain_plan).
+- Live Verification:
+  - Command: `python cli.py --demo` executed cleanly to completion with zero stubs/mock data.
+  - Topology inspection: Verified 13 registered nodes (`__start__`, `entry_router`, `intake_gate`, `data_assembly`, `critic`, `decision`, `explainer`, `monitor_ingress`, `data_refresh`, `change_detection`, `replanning`, `replan_explainer`, `retain_plan`), 9 static edges, 4 conditional edges.
+  - Full test suite: 320 passed, 8 skipped (`pytest -q --tb=short`).
+- Audit Evidence: All 10 architecture verification criteria verified with YES and concrete terminal traces.
+- Blockers: None. Next module: C2 (Telegram notification integration) or G3/G5 end-to-end rehearsals.

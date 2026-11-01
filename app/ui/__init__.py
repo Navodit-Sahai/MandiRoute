@@ -1,0 +1,2 @@
+"""MandiGuard UI package."""
+

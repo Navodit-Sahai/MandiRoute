@@ -4,8 +4,19 @@ MandiGuard Streamlit App - Entry Point (Stream C).
 Navigation:
 - 1_Plan: Enter dispatch requirements, check source health & assumptions, submit plan request.
 - 2_Compare: View candidate mandis on map, compare Plans A/B/C, review scenarios & evidence.
+- 3_Dispatch_and_Monitor: Live tracking, driver check-in, watchdog triggers, and dynamic replanning.
 """
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Ensure repository root is on sys.path so 'app' package is always resolvable
+for parent in Path(__file__).resolve().parents:
+    if (parent / "app").is_dir():
+        if str(parent) not in sys.path:
+            sys.path.insert(0, str(parent))
+        break
 
 import streamlit as st
 
@@ -40,8 +51,7 @@ MandiGuard evaluates multiple mandi destinations across price scenarios, transit
 #### Workflow:
 1. **Plan (`1_Plan`)**: Enter dispatch origin, tomato quantity (quintals), transport costs, and departure timing. View source health and system assumptions.
 2. **Compare (`2_Compare`)**: Review the route map, candidate mandis, and Plans A, B, and C with full scenario breakdowns, flip boundaries, and evidence ledger links.
-3. **Dispatch & Monitor**: Available post-dispatch for live tracking and trigger evaluation.
+3. **Dispatch & Monitor (`3_Dispatch_and_Monitor`)**: Live monitoring, driver check-in, watchdog triggers, and dynamic replanning.
 
 Select **1_Plan** from the sidebar to begin.
 """)
-
